@@ -3,7 +3,7 @@ name: Auto open PR to master
 on:
   push:
     branches:
-      - "issue-**"
+      - "issue-*"
 
 permissions:
   contents: read
@@ -13,12 +13,20 @@ jobs:
   open-pr:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Show debug info
+        run: |
+          echo "ref_name=${GITHUB_REF_NAME}"
+          echo "sha=${GITHUB_SHA}"
+          echo "head message (from git):"
+          git log -1 --pretty=%B
+
       - name: Check magic word in HEAD commit message
         id: magic
         shell: bash
         run: |
-          msg="${{ github.event.head_commit.message }}"
-          # Customize magic words here:
+          msg="$(git log -1 --pretty=%B)"
           if echo "$msg" | grep -Eiq '\b(complete|completed|fix|fixes|fixed|resolve|resolves|resolved)\b'; then
             echo "hit=true" >> "$GITHUB_OUTPUT"
           else
@@ -33,8 +41,7 @@ jobs:
         id: issue
         shell: bash
         run: |
-          br="${GITHUB_REF_NAME}"   # e.g. issue-123-desc
-          # Grab the first number sequence in the branch name:
+          br="${GITHUB_REF_NAME}"
           issue="$(echo "$br" | grep -Eo '[0-9]+' | head -n1 || true)"
           echo "number=$issue" >> "$GITHUB_OUTPUT"
 
@@ -43,22 +50,35 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          head="${GITHUB_REF_NAME}"
+          set -euo pipefail
+
           base="master"
+          head_branch="${GITHUB_REF_NAME}"
+          head_owner="${GITHUB_REPOSITORY_OWNER}"
+          head="${head_owner}:${head_branch}"
 
-          title="Merge ${head} -> ${base}"
-          body=""
-
+          title="Merge ${head_branch} -> ${base}"
           if [ -n "${{ steps.issue.outputs.number }}" ]; then
-            body="Fixes #${{ steps.issue.outputs.number }}\n\nAuto-opened from branch \`${head}\`."
+            body=$'Fixes #'"${{ steps.issue.outputs.number }}"$'\n\nAuto-opened from branch `'"${head_branch}"$'`.'
           else
-            body="Auto-opened from branch \`${head}\`."
+            body="Auto-opened from branch \`${head_branch}\`."
           fi
 
-          if url="$(gh pr view --head "$head" --base "$base" --json url -q .url 2>/dev/null)"; then
-            echo "PR already exists: $url; updating title/body."
-            gh pr edit "$url" --title "$title" --body "$body"
+          # Find existing PR by head/base
+          pr_url="$(gh pr list --state open --head "$head" --base "$base" --json url -q '.[0].url' || true)"
+
+          if [ -n "$pr_url" ]; then
+            echo "PR already exists: $pr_url; updating title/body."
+            gh pr edit "$pr_url" --title "$title" --body "$body"
             exit 0
           fi
 
-          gh pr create --base "$base" --head "$head" --title "$title" --body "$body"
+          # Create, but treat "already exists" as success (race-proof)
+          if ! gh pr create --base "$base" --head "$head_branch" --title "$title" --body "$body" 2>err.txt; then
+            if grep -qi "already exists" err.txt; then
+              echo "PR already exists (race); check satisfied."
+              exit 0
+            fi
+            cat err.txt >&2
+            exit 1
+          fi
