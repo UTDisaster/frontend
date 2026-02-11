@@ -60,8 +60,9 @@ jobs:
             body="Auto-opened from branch \`${head}\`."
           fi
 
-          if gh pr view --head "$head" --base "$base" >/dev/null 2>&1; then
-            echo "PR already exists."
+          if url="$(gh pr view --head "$head" --base "$base" --json url -q .url 2>/dev/null)"; then
+            echo "PR already exists: $url; updating title/body."
+            gh pr edit "$url" --title "$title" --body "$body"
             exit 0
           fi
 
