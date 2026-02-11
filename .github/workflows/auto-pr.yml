@@ -3,7 +3,7 @@ name: Auto open PR to master
 on:
   push:
     branches:
-      - "issue-**"
+      - "issue-*"
 
 permissions:
   contents: read
@@ -13,12 +13,20 @@ jobs:
   open-pr:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Show debug info
+        run: |
+          echo "ref_name=${GITHUB_REF_NAME}"
+          echo "sha=${GITHUB_SHA}"
+          echo "head message (from git):"
+          git log -1 --pretty=%B
+
       - name: Check magic word in HEAD commit message
         id: magic
         shell: bash
         run: |
-          msg="${{ github.event.head_commit.message }}"
-          # Customize magic words here:
+          msg="$(git log -1 --pretty=%B)"
           if echo "$msg" | grep -Eiq '\b(complete|completed|fix|fixes|fixed|resolve|resolves|resolved)\b'; then
             echo "hit=true" >> "$GITHUB_OUTPUT"
           else
@@ -33,12 +41,11 @@ jobs:
         id: issue
         shell: bash
         run: |
-          br="${GITHUB_REF_NAME}"   # e.g. issue-123-desc
-          # Grab the first number sequence in the branch name:
+          br="${GITHUB_REF_NAME}"
           issue="$(echo "$br" | grep -Eo '[0-9]+' | head -n1 || true)"
           echo "number=$issue" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update PR via GitHub CLI
+      - name: Create PR via GitHub CLI
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -47,15 +54,12 @@ jobs:
           base="master"
 
           title="Merge ${head} -> ${base}"
-          body=""
-
           if [ -n "${{ steps.issue.outputs.number }}" ]; then
-            body="Fixes #${{ steps.issue.outputs.number }}\n\nAuto-opened from branch \`${head}\`."
+            body=$'Fixes #'"${{ steps.issue.outputs.number }}"$'\n\nAuto-opened from branch `'"${head}"$'`.'
           else
             body="Auto-opened from branch \`${head}\`."
           fi
 
-          # If PR already exists, do nothing (or you can edit it).
           if gh pr view --head "$head" --base "$base" >/dev/null 2>&1; then
             echo "PR already exists."
             exit 0
