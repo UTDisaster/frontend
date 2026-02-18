@@ -1,4 +1,4 @@
-name: Auto open PR to master
+name: Auto open PR to main
 
 on:
   push:
@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          base="master"
+          base="main"
           head_branch="${GITHUB_REF_NAME}"
           head_owner="${GITHUB_REPOSITORY_OWNER}"
           head="${head_owner}:${head_branch}"
