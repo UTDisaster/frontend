@@ -4,11 +4,11 @@ import { useState } from 'react';
 import ChatPanel from './ChatPanel';
 
 const ChatDock = () => {
-    const [isOpen, setIsOpen] = useState(false)
+    const [isOpen, setIsOpen] = useState<boolean>(false)
 
     return (
         <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-4">
-            { isOpen && <ChatPanel /> }
+            { isOpen && <ChatPanel setIsOpen={() => setIsOpen(false)} /> }
             <button
                 className="grid h-14 w-14 place-items-center rounded-xl
                            bg-slate-950 text-white shadow-md

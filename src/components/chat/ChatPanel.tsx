@@ -1,6 +1,10 @@
 import { X } from 'lucide-react';
 
-const ChatPanel = () => {
+interface ChatPanelProps {
+    setIsOpen: (isOpen: boolean) => void;
+}
+
+const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
     return (
         <section
             className="w-[360px]
