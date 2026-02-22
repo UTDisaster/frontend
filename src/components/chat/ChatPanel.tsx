@@ -1,10 +1,61 @@
-import { X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { SubmitEventHandler } from 'react';
+
+import ChatInput from './components/ChatInput';
+import ChatHeader from './components/ChatHeader';
+import ChatMessageList from './components/ChatMessageList';
+import type { ChatMessage } from './types';
 
 interface ChatPanelProps {
     setIsOpen: (isOpen: boolean) => void;
 }
 
 const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        {
+            id: 1,
+            sender: 'agent',
+            text: 'Hi! Ask me anything about this disaster.',
+            sentAt: new Date(),
+        },
+        {
+            id: 2,
+            sender: 'user',
+            text: 'What locations report the highest severity of damage?',
+            sentAt: new Date(),
+        },
+    ]);
+    const [draft, setDraft] = useState('');
+    const listRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (!listRef.current) {
+            return;
+        }
+
+        listRef.current.scrollTop = listRef.current.scrollHeight;
+    }, [messages]);
+
+    const handleSend: SubmitEventHandler<HTMLFormElement> = (event) => {
+        event.preventDefault();
+
+        const trimmed = draft.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        setMessages((current) => [
+            ...current,
+            {
+                id: Date.now(),
+                sender: 'user',
+                text: trimmed,
+                sentAt: new Date(),
+            },
+        ]);
+        setDraft('');
+    };
+
     return (
         <section
             className="w-[360px]
@@ -13,30 +64,13 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
                        animate-rise
                        overflow-hidden"
         >
-            <header className="flex items-center justify-between
-                               px-5 py-4
-                               border-b border-slate-900/10">
-                <div>
-                    <p className="font-display text-base font-bold text-slate-900">
-                        Chat
-                    </p>
-                    <p className="text-xs text-slate-500">Ask questions</p>
-                </div>
-                <button
-                    className="grid h-8 w-8
-                               place-items-center
-                               rounded-lg
-                               bg-slate-900/10 text-slate-900
-                               transition hover:bg-slate-900/20"
-                    onClick={() => setIsOpen(false)}
-                >
-                    <X className="h-4 w-4" />
-                </button>
-            </header>
-            <div className="p-4">
-                { /* chat bubbles etc */ }
-                chat stuff here
-            </div>
+            <ChatHeader onClose={() => setIsOpen(false)} />
+            <ChatMessageList messages={messages} listRef={listRef} />
+            <ChatInput
+                draft={draft}
+                onDraftChange={setDraft}
+                onSend={handleSend}
+            />
         </section>
     );
 };
