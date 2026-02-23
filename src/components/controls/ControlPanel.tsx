@@ -7,7 +7,7 @@ const leftItems = [
 
 const ControlPanel = () => {
     return (
-        <div className="absolute left-4 right-4 top-4 z-10
+        <div className="absolute left-4 right-4 top-4 z-[1000]
                         flex items-center justify-between
                         pointer-events-none"
         >

@@ -7,7 +7,7 @@ const ChatDock = () => {
     const [isOpen, setIsOpen] = useState<boolean>(false);
 
     return (
-        <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-4">
+        <div className="absolute bottom-4 right-4 z-[1000] flex flex-col items-end gap-4">
             {isOpen && <ChatPanel setIsOpen={setIsOpen} />}
             <button
                 className="grid h-14 w-14 place-items-center rounded-xl
