@@ -13,7 +13,7 @@ const ControlPanel = () => {
         >
             <button className="grid h-12 w-12
                                place-items-center
-                               rounded-xl border border-white/70 bg-white/75
+                               rounded-xl border border-white/80 bg-white/90
                                shadow-md backgrop-blur-md
                                transition hover:-translate-y-0.5 hover:shadow-lg
                                pointer-events-auto" >
@@ -22,7 +22,7 @@ const ControlPanel = () => {
             <div className="flex items-center gap-2
                             p-2
                             rounded-xl
-                            border border-white/75 bg-white/75
+                            border border-white/80 bg-white/90
                             shadow-md backdrop-blur-md
                             pointer-events-auto"
             >

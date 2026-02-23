@@ -1,6 +1,6 @@
 import ChatDock from '@components/chat/ChatDock';
 import ControlPanel from '@components/controls/ControlPanel';
-import { MapContainer, TileLayer, useMap, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
 const Dashboard = () => {
     return (
@@ -16,7 +16,7 @@ const Dashboard = () => {
                 />
                     <Marker position={[51.505, -0.09]}>
                         <Popup> A pretty CSS3 popup. <br /> Easily customizable. </Popup>
-                </Marker>
+                    </Marker>
             </MapContainer>
 
             <ControlPanel />
