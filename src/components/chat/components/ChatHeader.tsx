@@ -10,6 +10,7 @@ interface ChatHeaderProps {
     isHistoryOpen: boolean;
     conversations: ChatConversation[];
     activeConversationId: string;
+    newChatId: string;
     onToggleHistory: () => void;
     onCloseHistory: () => void;
     onSelectConversation: (conversationId: string) => void;
@@ -22,6 +23,7 @@ const ChatHeader = ({
     isHistoryOpen,
     conversations,
     activeConversationId,
+    newChatId,
     onToggleHistory,
     onCloseHistory,
     onSelectConversation,
@@ -58,6 +60,7 @@ const ChatHeader = ({
                 isOpen={isHistoryOpen}
                 conversations={conversations}
                 activeConversationId={activeConversationId}
+                newChatId={newChatId}
                 onSelectConversation={onSelectConversation}
                 onClose={onCloseHistory}
             />

@@ -5,6 +5,7 @@ interface ChatHistoryMenuProps {
     isOpen: boolean;
     conversations: ChatConversation[];
     activeConversationId: string;
+    newChatId: string;
     onSelectConversation: (conversationId: string) => void;
     onClose: () => void;
 }
@@ -13,6 +14,7 @@ const ChatHistoryMenu = ({
     isOpen,
     conversations,
     activeConversationId,
+    newChatId,
     onSelectConversation,
     onClose,
 }: ChatHistoryMenuProps) => {
@@ -31,9 +33,32 @@ const ChatHistoryMenu = ({
                 </p>
             </div>
             <div className="max-h-72 overflow-y-auto p-2">
+                <button
+                    type="button"
+                    onClick={() => {
+                        onSelectConversation(newChatId);
+                        onClose();
+                    }}
+                    className={`mb-2 w-full rounded-lg px-3 py-2 text-left transition ${
+                        activeConversationId === newChatId
+                            ? 'bg-slate-900 text-white'
+                            : 'text-slate-900 hover:bg-slate-100'
+                    }`}
+                >
+                    <p className="text-sm font-semibold">New chat</p>
+                    <p
+                        className={`text-xs ${
+                            activeConversationId === newChatId
+                                ? 'text-slate-300'
+                                : 'text-slate-500'
+                        }`}
+                    >
+                        Start a new conversation
+                    </p>
+                </button>
                 {conversations.length === 0 ? (
                     <p className="px-2 py-3 text-sm text-slate-500">
-                        No previous chats available.
+                        No previous chats yet.
                     </p>
                 ) : (
                     conversations.map((conversation) => {

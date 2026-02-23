@@ -1,4 +1,4 @@
-{
-    "tabWidth": 4,
-    "useTabs": false,
-}
+export default {
+    tabWidth: 4,
+    useTabs: false,
+};

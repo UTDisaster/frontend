@@ -82,6 +82,8 @@ const createMessageId = (sender: Sender): string => {
     return `${sender}-${Date.now()}-${messageCounter}`;
 };
 
+const NEW_CHAT_ID = '';
+
 const appendMessageToConversation = (
     conversations: ChatConversation[],
     conversationId: string,
@@ -98,6 +100,22 @@ const appendMessageToConversation = (
             messages: [...conversation.messages, message],
         };
     });
+
+const createNewConversation = (
+    firstMessage: ChatMessage,
+): ChatConversation => {
+    const id = `conv-new-${Date.now()}`;
+    const title =
+        firstMessage.text.length > 40
+            ? `${firstMessage.text.slice(0, 40)}…`
+            : firstMessage.text;
+    return {
+        id,
+        title,
+        updatedAt: firstMessage.sentAt,
+        messages: [firstMessage],
+    };
+};
 
 const hydrateConversations = async (
     historyClient: ChatHistoryClient,
@@ -120,9 +138,8 @@ const hydrateConversations = async (
 const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
     const [conversations, setConversations] =
         useState<ChatConversation[]>(initialConversations);
-    const [activeConversationId, setActiveConversationId] = useState<string>(
-        initialConversations[0]?.id ?? '',
-    );
+    const [activeConversationId, setActiveConversationId] =
+        useState<string>(NEW_CHAT_ID);
     const [draft, setDraft] = useState('');
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [connectionState, setConnectionState] =
@@ -139,24 +156,27 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
         [conversations],
     );
 
+    const effectiveActiveId = useMemo(() => {
+        if (activeConversationId === NEW_CHAT_ID) return NEW_CHAT_ID;
+        const isCurrentInList = sortedConversations.some(
+            (c) => c.id === activeConversationId,
+        );
+        if (isCurrentInList) return activeConversationId;
+        return NEW_CHAT_ID;
+    }, [activeConversationId, sortedConversations]);
+
     const activeConversation = useMemo(
         () =>
             conversations.find(
-                (conversation) => conversation.id === activeConversationId,
+                (conversation) => conversation.id === effectiveActiveId,
             ) ?? null,
-        [conversations, activeConversationId],
+        [conversations, effectiveActiveId],
     );
 
     const connectionLabel = useMemo(
         () => buildConnectionLabel(connectionState, connectionMode),
         [connectionState, connectionMode],
     );
-
-    useEffect(() => {
-        if (!activeConversation && sortedConversations.length > 0) {
-            setActiveConversationId(sortedConversations[0].id);
-        }
-    }, [activeConversation, sortedConversations]);
 
     useEffect(() => {
         if (!listRef.current) {
@@ -194,6 +214,9 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
 
                 setConversations(nextConversations);
                 setActiveConversationId((currentConversationId) => {
+                    if (currentConversationId === NEW_CHAT_ID) {
+                        return NEW_CHAT_ID;
+                    }
                     if (
                         currentConversationId &&
                         nextConversations.some(
@@ -204,7 +227,7 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
                         return currentConversationId;
                     }
 
-                    return nextConversations[0].id;
+                    return NEW_CHAT_ID;
                 });
             };
 
@@ -322,7 +345,7 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
         event.preventDefault();
 
         const trimmed = draft.trim();
-        if (!trimmed || !activeConversation) {
+        if (!trimmed) {
             return;
         }
 
@@ -333,17 +356,36 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
             sentAt: new Date().toISOString(),
         };
 
-        setConversations((current) =>
-            appendMessageToConversation(current, activeConversation.id, userMessage),
-        );
+        if (effectiveActiveId === NEW_CHAT_ID) {
+            const newConversation = createNewConversation(userMessage);
+            setConversations((current) =>
+                sortConversationsByUpdatedAt([newConversation, ...current]),
+            );
+            setActiveConversationId(newConversation.id);
 
-        const outboundEvent: ChatOutboundEventEnvelope = {
-            type: 'chat.user_message',
-            conversation_id: activeConversation.id,
-            message: mapUiMessageToMessageRecord(userMessage),
-        };
+            const outboundEvent: ChatOutboundEventEnvelope = {
+                type: 'chat.user_message',
+                conversation_id: newConversation.id,
+                message: mapUiMessageToMessageRecord(userMessage),
+            };
+            realtimeClientRef.current?.send(outboundEvent);
+        } else if (activeConversation) {
+            setConversations((current) =>
+                appendMessageToConversation(
+                    current,
+                    activeConversation.id,
+                    userMessage,
+                ),
+            );
 
-        realtimeClientRef.current?.send(outboundEvent);
+            const outboundEvent: ChatOutboundEventEnvelope = {
+                type: 'chat.user_message',
+                conversation_id: activeConversation.id,
+                message: mapUiMessageToMessageRecord(userMessage),
+            };
+            realtimeClientRef.current?.send(outboundEvent);
+        }
+
         setDraft('');
     };
 
@@ -354,7 +396,7 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
 
     return (
         <section
-            className="w-[360px]
+            className="w-[720px]
                        rounded-xl border border-white/80 bg-white/90 shadow-xl
                        backdrop-blur-md
                        animate-rise
@@ -363,12 +405,13 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
             <ChatHeader
                 onClose={() => setIsOpen(false)}
                 conversationTitle={
-                    activeConversation?.title ?? 'No active conversation'
+                    activeConversation?.title ?? 'New chat'
                 }
                 connectionLabel={connectionLabel}
                 isHistoryOpen={isHistoryOpen}
                 conversations={sortedConversations}
-                activeConversationId={activeConversation?.id ?? ''}
+                activeConversationId={effectiveActiveId}
+                newChatId={NEW_CHAT_ID}
                 onToggleHistory={() =>
                     setIsHistoryOpen((currentState) => !currentState)
                 }
