@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SubmitEventHandler } from 'react';
 
+import { createChatHistoryClient } from './clients/history/createChatHistoryClient';
+import { createMockChatHistoryClient } from './clients/history/mockChatHistoryClient';
+import type { ChatHistoryClient } from './clients/history/types';
+import { createChatRealtimeClient } from './clients/realtime/createChatRealtimeClient';
+import { createMockChatRealtimeClient } from './clients/realtime/mockChatRealtimeClient';
+import type { ChatRealtimeClient } from './clients/realtime/types';
 import ChatInput from './components/ChatInput';
 import ChatHeader from './components/ChatHeader';
 import ChatMessageList from './components/ChatMessageList';
-import mockConversations from './mockConversations';
-import { createChatTransport } from './transport/createChatTransport';
+import { getChatRuntimeConfig } from './config';
 import type {
-    ChatTransport,
-    TransportInboundMessage,
-} from './transport/types';
+    ChatInboundEventEnvelope,
+    ChatOutboundEventEnvelope,
+} from './contracts';
+import {
+    mapConversationDetailToUiConversation,
+    mapMessageRecordToUiMessage,
+    mapUiMessageToMessageRecord,
+} from './mappers';
+import mockConversations from './mockConversations';
 import type {
     ChatConnectionState,
     ChatConversation,
@@ -21,6 +32,8 @@ interface ChatPanelProps {
     setIsOpen: (isOpen: boolean) => void;
 }
 
+const runtimeConfig = getChatRuntimeConfig();
+
 const sortConversationsByUpdatedAt = (
     conversations: ChatConversation[],
 ): ChatConversation[] =>
@@ -29,7 +42,39 @@ const sortConversationsByUpdatedAt = (
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
 
-const initialConversations = sortConversationsByUpdatedAt(mockConversations);
+const initialConversations = sortConversationsByUpdatedAt(
+    mockConversations.summaries
+        .map((summary) => {
+            const detail = mockConversations.details[summary.id];
+            if (!detail) {
+                return null;
+            }
+
+            return mapConversationDetailToUiConversation(detail, summary.title);
+        })
+        .filter((conversation): conversation is ChatConversation =>
+            Boolean(conversation),
+        ),
+);
+
+const buildConnectionLabel = (
+    state: ChatConnectionState,
+    mode: 'mock' | 'live',
+): string => {
+    if (state === 'connecting') {
+        return `Connecting (${mode})...`;
+    }
+
+    if (state === 'connected') {
+        return `Connected (${mode})`;
+    }
+
+    if (state === 'error') {
+        return `Connection error (${mode})`;
+    }
+
+    return 'Disconnected';
+};
 
 let messageCounter = 0;
 const createMessageId = (sender: Sender): string => {
@@ -54,11 +99,22 @@ const appendMessageToConversation = (
         };
     });
 
-const connectionLabelByState: Record<ChatConnectionState, string> = {
-    connecting: 'Connecting...',
-    connected: 'Connected (mock)',
-    error: 'Connection error (mock)',
-    disconnected: 'Disconnected',
+const hydrateConversations = async (
+    historyClient: ChatHistoryClient,
+): Promise<ChatConversation[]> => {
+    const summaries = await historyClient.getConversations();
+    const detailsByConversation = await Promise.all(
+        summaries.map(async (summary) => ({
+            summary,
+            detail: await historyClient.getConversation(summary.id),
+        })),
+    );
+
+    return sortConversationsByUpdatedAt(
+        detailsByConversation.map(({ summary, detail }) =>
+            mapConversationDetailToUiConversation(detail, summary.title),
+        ),
+    );
 };
 
 const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
@@ -71,9 +127,12 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [connectionState, setConnectionState] =
         useState<ChatConnectionState>('connecting');
+    const [connectionMode, setConnectionMode] = useState<'mock' | 'live'>(
+        'mock',
+    );
 
     const listRef = useRef<HTMLDivElement | null>(null);
-    const transportRef = useRef<ChatTransport | null>(null);
+    const realtimeClientRef = useRef<ChatRealtimeClient | null>(null);
 
     const sortedConversations = useMemo(
         () => sortConversationsByUpdatedAt(conversations),
@@ -86,6 +145,11 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
                 (conversation) => conversation.id === activeConversationId,
             ) ?? null,
         [conversations, activeConversationId],
+    );
+
+    const connectionLabel = useMemo(
+        () => buildConnectionLabel(connectionState, connectionMode),
+        [connectionState, connectionMode],
     );
 
     useEffect(() => {
@@ -103,39 +167,154 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
     }, [activeConversation?.messages]);
 
     useEffect(() => {
-        const transport = createChatTransport();
-        transportRef.current = transport;
-
-        const handleIncomingMessage = ({
-            conversationId,
-            message,
-        }: TransportInboundMessage) => {
-            setConversations((current) =>
-                appendMessageToConversation(current, conversationId, message),
-            );
-        };
-
-        const unsubscribe = transport.subscribe(handleIncomingMessage);
         let isCancelled = false;
 
-        void transport
-            .connect()
-            .then(() => {
+        const load = async () => {
+            let historyClient: ChatHistoryClient | null = null;
+
+            try {
+                historyClient = createChatHistoryClient(runtimeConfig);
+            } catch {
+                if (runtimeConfig.chatMode === 'live') {
+                    return;
+                }
+
+                historyClient = createMockChatHistoryClient();
+            }
+
+            if (!historyClient) {
+                return;
+            }
+
+            const hydrateAndApply = async (client: ChatHistoryClient) => {
+                const nextConversations = await hydrateConversations(client);
+                if (isCancelled || nextConversations.length === 0) {
+                    return;
+                }
+
+                setConversations(nextConversations);
+                setActiveConversationId((currentConversationId) => {
+                    if (
+                        currentConversationId &&
+                        nextConversations.some(
+                            (conversation) =>
+                                conversation.id === currentConversationId,
+                        )
+                    ) {
+                        return currentConversationId;
+                    }
+
+                    return nextConversations[0].id;
+                });
+            };
+
+            try {
+                await hydrateAndApply(historyClient);
+            } catch {
+                if (
+                    runtimeConfig.chatMode === 'auto' &&
+                    historyClient.mode === 'live'
+                ) {
+                    const mockHistoryClient = createMockChatHistoryClient();
+                    await hydrateAndApply(mockHistoryClient);
+                }
+            }
+        };
+
+        void load();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let isCancelled = false;
+        let unsubscribe = () => {};
+
+        const attachClient = async (
+            client: ChatRealtimeClient,
+            allowFallbackToMock: boolean,
+        ) => {
+            realtimeClientRef.current = client;
+            setConnectionMode(client.mode);
+            setConnectionState('connecting');
+
+            const handleInboundEvent = (event: ChatInboundEventEnvelope) => {
+                if (event.type === 'chat.error') {
+                    setConnectionState('error');
+                    return;
+                }
+
+                if (event.type !== 'chat.agent_message') {
+                    return;
+                }
+
+                const inboundMessage = mapMessageRecordToUiMessage(event.message);
+                setConversations((current) =>
+                    appendMessageToConversation(
+                        current,
+                        event.conversation_id,
+                        inboundMessage,
+                    ),
+                );
+            };
+
+            unsubscribe = client.subscribe(handleInboundEvent);
+
+            try {
+                await client.connect();
                 if (!isCancelled) {
                     setConnectionState('connected');
                 }
-            })
-            .catch(() => {
+            } catch {
+                unsubscribe();
+                client.disconnect();
+
+                if (!isCancelled && allowFallbackToMock) {
+                    const mockRealtimeClient = createMockChatRealtimeClient();
+                    await attachClient(mockRealtimeClient, false);
+                    return;
+                }
+
                 if (!isCancelled) {
                     setConnectionState('error');
                 }
-            });
+            }
+        };
+
+        const start = async () => {
+            let realtimeClient: ChatRealtimeClient | null = null;
+
+            try {
+                realtimeClient = createChatRealtimeClient(runtimeConfig);
+            } catch {
+                if (runtimeConfig.chatMode === 'live') {
+                    setConnectionState('error');
+                    return;
+                }
+
+                realtimeClient = createMockChatRealtimeClient();
+            }
+
+            if (!realtimeClient) {
+                setConnectionState('error');
+                return;
+            }
+
+            const allowFallbackToMock =
+                runtimeConfig.chatMode === 'auto' &&
+                realtimeClient.mode === 'live';
+            await attachClient(realtimeClient, allowFallbackToMock);
+        };
+
+        void start();
 
         return () => {
             isCancelled = true;
             unsubscribe();
-            transport.disconnect();
-            transportRef.current = null;
+            realtimeClientRef.current?.disconnect();
+            realtimeClientRef.current = null;
         };
     }, []);
 
@@ -157,10 +336,14 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
         setConversations((current) =>
             appendMessageToConversation(current, activeConversation.id, userMessage),
         );
-        transportRef.current?.send({
-            conversationId: activeConversation.id,
-            message: userMessage,
-        });
+
+        const outboundEvent: ChatOutboundEventEnvelope = {
+            type: 'chat.user_message',
+            conversation_id: activeConversation.id,
+            message: mapUiMessageToMessageRecord(userMessage),
+        };
+
+        realtimeClientRef.current?.send(outboundEvent);
         setDraft('');
     };
 
@@ -182,7 +365,7 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
                 conversationTitle={
                     activeConversation?.title ?? 'No active conversation'
                 }
-                connectionLabel={connectionLabelByState[connectionState]}
+                connectionLabel={connectionLabel}
                 isHistoryOpen={isHistoryOpen}
                 conversations={sortedConversations}
                 activeConversationId={activeConversation?.id ?? ''}
