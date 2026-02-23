@@ -20,9 +20,7 @@ const ChatBubble = ({ message }: ChatBubbleProps) => {
                 <p className="text-sm leading-relaxed">{message.text}</p>
                 <p
                     className={`mt-1 text-xs ${
-                        isUser
-                            ? 'text-slate-300'
-                            : 'text-slate-500'
+                        isUser ? 'text-slate-300' : 'text-slate-500'
                     }`}
                 >
                     {formatMessageTime(message.sentAt)}
