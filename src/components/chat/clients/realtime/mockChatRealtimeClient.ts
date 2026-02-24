@@ -5,9 +5,9 @@ import type {
 import type { ChatRealtimeClient, ChatRealtimeEventHandler } from './types';
 
 const responseTemplates = [
-    'Thanks, I am checking that context now.',
-    'Noted. I can map that request to the latest disaster snapshot.',
-    'Understood. I will keep that thread focused while we continue.',
+    'Checking damage data for that area now.',
+    'Mapping your query to the Hurricane Florence predictions.',
+    'Looking up VLM classifications and ground truth for that region.',
 ];
 
 const buildResponseText = (
