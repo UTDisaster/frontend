@@ -1,22 +1,31 @@
 import { Layers, Menu } from 'lucide-react';
 
 const leftItems = [
-  { label: 'Overlays', icon: Layers, id: 'overlays' },
-  { label: '', icon: Layers, id: 'some-toggle' },
+    { label: 'Overlays', icon: Layers, id: 'overlays' },
+    { label: '', icon: Layers, id: 'some-toggle' },
 ];
 
-const ControlPanel = () => {
+interface ControlPanelProps {
+    onMenuClick?: () => void;
+}
+
+const ControlPanel = ({ onMenuClick }: ControlPanelProps) => {
     return (
         <div className="absolute left-4 right-4 top-4 z-10
                         flex items-center justify-between
                         pointer-events-none"
         >
-            <button className="grid h-12 w-12
+            <button
+                type="button"
+                className="grid h-12 w-12
                                place-items-center
                                rounded-xl border border-white/70 bg-white/75
-                               shadow-md backgrop-blur-md
+                               shadow-md backdrop-blur-md
                                transition hover:-translate-y-0.5 hover:shadow-lg
-                               pointer-events-auto" >
+                               pointer-events-auto"
+                onClick={onMenuClick}
+                aria-label="Open menu"
+            >
                 <Menu className="h-6 w-6 text-slate-900" />
             </button>
             <div className="flex items-center gap-2
@@ -26,9 +35,9 @@ const ControlPanel = () => {
                             shadow-md backdrop-blur-md
                             pointer-events-auto"
             >
-                {leftItems.map(({ label, icon: Icon }) => (
+                {leftItems.map(({ label, icon: Icon, id }) => (
                     <button
-                        key={label}
+                        key={id}
                         className="flex items-center gap-2
                                    px-4 py-2
                                    text-sm font-semibold text-slate-900
