@@ -11,7 +11,7 @@ interface ControlPanelProps {
 
 const ControlPanel = ({ onMenuClick }: ControlPanelProps) => {
     return (
-        <div className="absolute left-4 right-4 top-4 z-10
+        <div className="absolute left-4 right-4 top-4 z-[1000]
                         flex items-center justify-between
                         pointer-events-none"
         >
@@ -31,7 +31,7 @@ const ControlPanel = ({ onMenuClick }: ControlPanelProps) => {
             <div className="flex items-center gap-2
                             p-2
                             rounded-xl
-                            border border-white/75 bg-white/75
+                            border border-white/80 bg-white/90
                             shadow-md backdrop-blur-md
                             pointer-events-auto"
             >
