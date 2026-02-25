@@ -1,25 +1,36 @@
+import { useEffect, useState } from 'react';
+
 import ChatDock from '@components/chat/ChatDock';
+import DashboardSidebar from '@components/dashboard/DashboardSidebar';
 import ControlPanel from '@components/controls/ControlPanel';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import ErrorBoundary from '@components/ErrorBoundary';
+import MapView from '@components/map/MapView';
 
 const Dashboard = () => {
-    return (
-        <div className="relative isolate h-full w-full overflow-hidden text-slate-950">
-            <MapContainer
-                className="absolute inset-0 z-0 h-full w-full bg-slate-200"
-                center={[51.505, -0.09]} zoom={13} scrollWheelZoom={true}
-                zoomControl={false}
-            >
-                <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                    <Marker position={[51.505, -0.09]}>
-                        <Popup> A pretty CSS3 popup. <br /> Easily customizable. </Popup>
-                    </Marker>
-            </MapContainer>
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [mapReady, setMapReady] = useState(false);
 
-            <ControlPanel />
+    useEffect(() => {
+        setMapReady(true);
+    }, []);
+
+    return (
+        <div className="relative min-h-screen h-full w-full overflow-hidden text-slate-950">
+            <div className="absolute inset-0 z-0">
+                <ErrorBoundary
+                    fallback={
+                        <div className="h-full w-full bg-slate-300" aria-hidden />
+                    }
+                >
+                    {mapReady ? <MapView /> : <div className="h-full w-full bg-slate-300" />}
+                </ErrorBoundary>
+            </div>
+
+            <ControlPanel onMenuClick={() => setIsSidebarOpen(true)} />
+            <DashboardSidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
             <ChatDock />
         </div>
     );
