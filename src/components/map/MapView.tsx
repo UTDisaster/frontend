@@ -53,6 +53,7 @@ const MapView = ({ polygons = SAMPLE_POLYGONS }: MapViewProps) => {
             zoom={DEFAULT_ZOOM}
             className="h-full w-full"
             scrollWheelZoom
+            zoomControl={false}
         >
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

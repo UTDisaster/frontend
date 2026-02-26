@@ -6,28 +6,31 @@ const leftItems = [
 ];
 
 interface ControlPanelProps {
+    isSidebarOpen?: boolean;
     onMenuClick?: () => void;
 }
 
-const ControlPanel = ({ onMenuClick }: ControlPanelProps) => {
+const ControlPanel = ({ isSidebarOpen, onMenuClick }: ControlPanelProps) => {
     return (
         <div className="absolute left-4 right-4 top-4 z-[1000]
                         flex items-center justify-between
                         pointer-events-none"
         >
-            <button
-                type="button"
-                className="grid h-12 w-12
+            {!isSidebarOpen && (
+                <button
+                    type="button"
+                    className="grid h-12 w-12
                                place-items-center
                                rounded-xl border border-white/70 bg-white/75
                                shadow-md backdrop-blur-md
                                transition hover:-translate-y-0.5 hover:shadow-lg
                                pointer-events-auto"
-                onClick={onMenuClick}
-                aria-label="Open menu"
-            >
-                <Menu className="h-6 w-6 text-slate-900" />
-            </button>
+                    onClick={onMenuClick}
+                    aria-label="Open menu"
+                >
+                    <Menu className="h-6 w-6 text-slate-900" />
+                </button>
+            )}
             <div className="flex items-center gap-2
                             p-2
                             rounded-xl
