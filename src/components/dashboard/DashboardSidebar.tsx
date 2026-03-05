@@ -1,9 +1,17 @@
-import { MapPin } from 'lucide-react';
+import { MessageSquare, User, MapPin, Info, Users } from 'lucide-react';
 
 interface DashboardSidebarProps {
     isOpen: boolean;
     onClose: () => void;
 }
+
+const navItems = [
+    { label: 'Chat History', icon: MessageSquare },
+    { label: 'User info', icon: User },
+    { label: 'Disaster selection', icon: MapPin },
+    { label: 'Disaster info', icon: Info },
+    { label: 'Project info & acknowledgements', icon: Users },
+];
 
 const DashboardSidebar = ({ isOpen, onClose }: DashboardSidebarProps) => {
     if (!isOpen) {
@@ -40,17 +48,19 @@ const DashboardSidebar = ({ isOpen, onClose }: DashboardSidebarProps) => {
                 </div>
                 <nav className="p-4">
                     <ul className="space-y-1">
-                        <li>
-                            <button
-                                type="button"
-                                className="flex w-full items-center gap-3 rounded-lg
-                                           px-3 py-2 text-left text-sm font-medium text-slate-900
-                                           transition hover:bg-slate-100"
-                            >
-                                <MapPin className="h-4 w-4 text-slate-600" />
-                                Map
-                            </button>
-                        </li>
+                        {navItems.map(({ label, icon: Icon }) => (
+                            <li key={label}>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-3 rounded-lg
+                                               px-3 py-2 text-left text-sm font-medium text-slate-900
+                                               transition hover:bg-slate-100"
+                                >
+                                    <Icon className="h-4 w-4 text-slate-600" />
+                                    {label}
+                                </button>
+                            </li>
+                        ))}
                     </ul>
                 </nav>
             </aside>

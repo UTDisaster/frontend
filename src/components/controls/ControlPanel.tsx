@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
-import { Layers, Menu } from 'lucide-react';
+import { Layers, Menu } from "lucide-react";
 
-export type ImageOverlayMode = 'pre' | 'post' | 'none';
+export type ImageOverlayMode = "pre" | "post" | "none";
 
 export interface LocationToggleState {
     moderate: boolean;
@@ -20,14 +20,18 @@ interface ControlPanelProps {
     onDisableAllArtifactsChange: (value: boolean) => void;
     onImageOverlayOpacityChange: (value: number) => void;
     onImageOverlayModeChange: (mode: ImageOverlayMode) => void;
-    onLocationToggleChange: (key: keyof LocationToggleState, enabled: boolean) => void;
+    onLocationToggleChange: (
+        key: keyof LocationToggleState,
+        enabled: boolean,
+    ) => void;
     onMenuClick?: () => void;
+    isSidebarOpen?: boolean;
 }
 
 const imageOptions: { label: string; value: ImageOverlayMode }[] = [
-    { label: 'Pre', value: 'pre' },
-    { label: 'Post', value: 'post' },
-    { label: 'None', value: 'none' },
+    { label: "Pre", value: "pre" },
+    { label: "Post", value: "post" },
+    { label: "None", value: "none" },
 ];
 
 const locationOptions: {
@@ -35,11 +39,11 @@ const locationOptions: {
     key: keyof LocationToggleState;
     label: string;
 }[] = [
-    { key: 'unknown', label: 'Unknown', colorClass: 'bg-slate-400' },
-    { key: 'none', label: 'None', colorClass: 'bg-green-500' },
-    { key: 'some', label: 'Some', colorClass: 'bg-yellow-400' },
-    { key: 'moderate', label: 'Moderate', colorClass: 'bg-orange-500' },
-    { key: 'severe', label: 'Severe', colorClass: 'bg-red-500' },
+    { key: "unknown", label: "Unknown", colorClass: "bg-slate-400" },
+    { key: "none", label: "None", colorClass: "bg-green-500" },
+    { key: "some", label: "Some", colorClass: "bg-yellow-400" },
+    { key: "moderate", label: "Moderate", colorClass: "bg-orange-500" },
+    { key: "severe", label: "Severe", colorClass: "bg-red-500" },
 ];
 
 const ControlPanel = ({
@@ -52,6 +56,7 @@ const ControlPanel = ({
     onImageOverlayModeChange,
     onLocationToggleChange,
     onMenuClick,
+    isSidebarOpen,
 }: ControlPanelProps) => {
     const [isOverlayMenuOpen, setIsOverlayMenuOpen] = useState(false);
     const overlayMenuRef = useRef<HTMLDivElement | null>(null);
@@ -63,13 +68,16 @@ const ControlPanel = ({
             const target = event.target as Node | null;
             if (!target) return;
 
-            if (overlayMenuRef.current && !overlayMenuRef.current.contains(target)) {
+            if (
+                overlayMenuRef.current &&
+                !overlayMenuRef.current.contains(target)
+            ) {
                 setIsOverlayMenuOpen(false);
             }
         };
 
-        document.addEventListener('mousedown', onPointerDown);
-        return () => document.removeEventListener('mousedown', onPointerDown);
+        document.addEventListener("mousedown", onPointerDown);
+        return () => document.removeEventListener("mousedown", onPointerDown);
     }, [isOverlayMenuOpen]);
 
     return (
@@ -78,28 +86,29 @@ const ControlPanel = ({
                         flex items-start justify-between
                         pointer-events-none"
         >
-            <button
-                type="button"
-                className="grid h-12 w-12
+            {!isSidebarOpen && (
+                <button
+                    type="button"
+                    className="grid h-12 w-12
                                place-items-center
                                rounded-xl border border-white/70 bg-white/75
                                shadow-md backdrop-blur-md
                                transition hover:-translate-y-0.5 hover:shadow-lg
                                pointer-events-auto"
-                onClick={onMenuClick}
-                aria-label="Open menu"
-            >
-                <Menu className="h-6 w-6 text-slate-900" />
-            </button>
-
+                    onClick={onMenuClick}
+                    aria-label="Open menu"
+                >
+                    <Menu className="h-6 w-6 text-slate-900" />
+                </button>
+            )}
             <div
                 ref={overlayMenuRef}
                 className="relative flex items-center gap-2
-                            p-2
-                            rounded-xl
-                            border border-white/80 bg-white/90
-                            shadow-md backdrop-blur-md
-                            pointer-events-auto"
+                                        p-2
+                                        rounded-xl
+                                        border border-white/80 bg-white/90
+                                        shadow-md backdrop-blur-md
+                                        pointer-events-auto"
             >
                 <button
                     type="button"
@@ -129,17 +138,22 @@ const ControlPanel = ({
                             </h3>
                             <div className="flex gap-2">
                                 {imageOptions.map((option) => {
-                                    const isActive = option.value === imageOverlayMode;
+                                    const isActive =
+                                        option.value === imageOverlayMode;
                                     return (
                                         <button
                                             key={option.value}
                                             type="button"
                                             className={`rounded-md border px-3 py-1.5 text-sm font-semibold transition ${
                                                 isActive
-                                                    ? 'border-blue-600 bg-blue-600 text-white'
-                                                    : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                                                    ? "border-blue-600 bg-blue-600 text-white"
+                                                    : "border-slate-300 text-slate-700 hover:bg-slate-100"
                                             }`}
-                                            onClick={() => onImageOverlayModeChange(option.value)}
+                                            onClick={() =>
+                                                onImageOverlayModeChange(
+                                                    option.value,
+                                                )
+                                            }
                                         >
                                             {option.label}
                                         </button>
@@ -160,7 +174,9 @@ const ControlPanel = ({
                                     min={0}
                                     max={100}
                                     step={1}
-                                    value={Math.round(imageOverlayOpacity * 100)}
+                                    value={Math.round(
+                                        imageOverlayOpacity * 100,
+                                    )}
                                     onChange={(event) =>
                                         onImageOverlayOpacityChange(
                                             Number(event.target.value) / 100,
@@ -183,17 +199,21 @@ const ControlPanel = ({
                                     aria-checked={!disableAllArtifacts}
                                     aria-label="Toggle artifacts"
                                     className={`relative h-5 w-9 rounded-full transition ${
-                                        disableAllArtifacts ? 'bg-slate-300' : 'bg-blue-600'
+                                        disableAllArtifacts
+                                            ? "bg-slate-300"
+                                            : "bg-blue-600"
                                     }`}
                                     onClick={() =>
-                                        onDisableAllArtifactsChange(!disableAllArtifacts)
+                                        onDisableAllArtifactsChange(
+                                            !disableAllArtifacts,
+                                        )
                                     }
                                 >
                                     <span
                                         className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
                                             disableAllArtifacts
-                                                ? 'left-0.5'
-                                                : 'left-[18px]'
+                                                ? "left-0.5"
+                                                : "left-[18px]"
                                         }`}
                                     />
                                 </button>
@@ -217,7 +237,9 @@ const ControlPanel = ({
                                                 onClick={() =>
                                                     onLocationToggleChange(
                                                         option.key,
-                                                        !locationToggles[option.key],
+                                                        !locationToggles[
+                                                            option.key
+                                                        ],
                                                     )
                                                 }
                                                 aria-label={option.label}
@@ -228,7 +250,9 @@ const ControlPanel = ({
                                                 >
                                                     {option.label}
                                                 </span>
-                                                {!locationToggles[option.key] ? (
+                                                {!locationToggles[
+                                                    option.key
+                                                ] ? (
                                                     <span
                                                         className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-6 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded bg-slate-700"
                                                         aria-hidden

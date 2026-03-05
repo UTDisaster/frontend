@@ -4,7 +4,6 @@ import type { SubmitEventHandler } from 'react';
 import { createChatHistoryClient } from './clients/history/createChatHistoryClient';
 import { createMockChatHistoryClient } from './clients/history/mockChatHistoryClient';
 import type { ChatHistoryClient } from './clients/history/types';
-import { createChatRealtimeClient } from './clients/realtime/createChatRealtimeClient';
 import { createMockChatRealtimeClient } from './clients/realtime/mockChatRealtimeClient';
 import type { ChatRealtimeClient } from './clients/realtime/types';
 import ChatInput from './components/ChatInput';
@@ -57,22 +56,10 @@ const initialConversations = sortConversationsByUpdatedAt(
         ),
 );
 
-const buildConnectionLabel = (
-    state: ChatConnectionState,
-    mode: 'mock' | 'live',
-): string => {
-    if (state === 'connecting') {
-        return `Connecting (${mode})...`;
-    }
-
-    if (state === 'connected') {
-        return `Connected (${mode})`;
-    }
-
-    if (state === 'error') {
-        return `Connection error (${mode})`;
-    }
-
+const buildConnectionLabel = (state: ChatConnectionState): string => {
+    if (state === 'connecting') return 'Connecting...';
+    if (state === 'connected') return 'Mock';
+    if (state === 'error') return 'Connection error';
     return 'Disconnected';
 };
 
@@ -144,9 +131,6 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [connectionState, setConnectionState] =
         useState<ChatConnectionState>('connecting');
-    const [connectionMode, setConnectionMode] = useState<'mock' | 'live'>(
-        'mock',
-    );
 
     const listRef = useRef<HTMLDivElement | null>(null);
     const realtimeClientRef = useRef<ChatRealtimeClient | null>(null);
@@ -174,8 +158,8 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
     );
 
     const connectionLabel = useMemo(
-        () => buildConnectionLabel(connectionState, connectionMode),
-        [connectionState, connectionMode],
+        () => buildConnectionLabel(connectionState),
+        [connectionState],
     );
 
     useEffect(() => {
@@ -195,10 +179,6 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
             try {
                 historyClient = createChatHistoryClient(runtimeConfig);
             } catch {
-                if (runtimeConfig.chatMode === 'live') {
-                    return;
-                }
-
                 historyClient = createMockChatHistoryClient();
             }
 
@@ -234,13 +214,8 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
             try {
                 await hydrateAndApply(historyClient);
             } catch {
-                if (
-                    runtimeConfig.chatMode === 'auto' &&
-                    historyClient.mode === 'live'
-                ) {
-                    const mockHistoryClient = createMockChatHistoryClient();
-                    await hydrateAndApply(mockHistoryClient);
-                }
+                const mockHistoryClient = createMockChatHistoryClient();
+                await hydrateAndApply(mockHistoryClient);
             }
         };
 
@@ -255,36 +230,33 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
         let isCancelled = false;
         let unsubscribe = () => {};
 
-        const attachClient = async (
-            client: ChatRealtimeClient,
-            allowFallbackToMock: boolean,
-        ) => {
-            realtimeClientRef.current = client;
-            setConnectionMode(client.mode);
-            setConnectionState('connecting');
+        const client: ChatRealtimeClient = createMockChatRealtimeClient();
+        realtimeClientRef.current = client;
+        setConnectionState('connecting');
 
-            const handleInboundEvent = (event: ChatInboundEventEnvelope) => {
-                if (event.type === 'chat.error') {
-                    setConnectionState('error');
-                    return;
-                }
+        const handleInboundEvent = (event: ChatInboundEventEnvelope) => {
+            if (event.type === 'chat.error') {
+                setConnectionState('error');
+                return;
+            }
 
-                if (event.type !== 'chat.agent_message') {
-                    return;
-                }
+            if (event.type !== 'chat.agent_message') {
+                return;
+            }
 
-                const inboundMessage = mapMessageRecordToUiMessage(event.message);
-                setConversations((current) =>
-                    appendMessageToConversation(
-                        current,
-                        event.conversation_id,
-                        inboundMessage,
-                    ),
-                );
-            };
+            const inboundMessage = mapMessageRecordToUiMessage(event.message);
+            setConversations((current) =>
+                appendMessageToConversation(
+                    current,
+                    event.conversation_id,
+                    inboundMessage,
+                ),
+            );
+        };
 
-            unsubscribe = client.subscribe(handleInboundEvent);
+        unsubscribe = client.subscribe(handleInboundEvent);
 
+        const start = async () => {
             try {
                 await client.connect();
                 if (!isCancelled) {
@@ -293,42 +265,10 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
             } catch {
                 unsubscribe();
                 client.disconnect();
-
-                if (!isCancelled && allowFallbackToMock) {
-                    const mockRealtimeClient = createMockChatRealtimeClient();
-                    await attachClient(mockRealtimeClient, false);
-                    return;
-                }
-
                 if (!isCancelled) {
                     setConnectionState('error');
                 }
             }
-        };
-
-        const start = async () => {
-            let realtimeClient: ChatRealtimeClient | null = null;
-
-            try {
-                realtimeClient = createChatRealtimeClient(runtimeConfig);
-            } catch {
-                if (runtimeConfig.chatMode === 'live') {
-                    setConnectionState('error');
-                    return;
-                }
-
-                realtimeClient = createMockChatRealtimeClient();
-            }
-
-            if (!realtimeClient) {
-                setConnectionState('error');
-                return;
-            }
-
-            const allowFallbackToMock =
-                runtimeConfig.chatMode === 'auto' &&
-                realtimeClient.mode === 'live';
-            await attachClient(realtimeClient, allowFallbackToMock);
         };
 
         void start();
