@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { LatLngBoundsExpression, LatLngExpression } from 'leaflet';
 import { ImageOverlay, MapContainer, Polygon, TileLayer, useMap } from 'react-leaflet';
 
+import type { ImageOverlayMode } from '@components/controls/ControlPanel';
 import {
     defaultOverlayJsonAdapter,
     type MapImageOverlay,
@@ -14,9 +15,14 @@ import type { MapPolygon } from './types';
 const DEFAULT_CENTER: [number, number] = [30.2672, -97.7431];
 const DEFAULT_ZOOM = 10;
 const OVERLAY_DATA_URL = '/hurricane-florence_00000087_post_disaster.json';
-const OVERLAY_IMAGE_URL = '/hurricane-florence_00000087_post_disaster.png';
+const OVERLAY_IMAGE_URL_BY_MODE: Record<Exclude<ImageOverlayMode, 'none'>, string> = {
+    post: '/hurricane-florence_00000087_post_disaster.png',
+    pre: '/hurricane-florence_00000087_pre_disaster.png',
+};
 
 interface MapViewProps {
+    imageOverlayOpacity?: number;
+    imageOverlayMode?: ImageOverlayMode;
     polygons?: MapPolygon[];
 }
 
@@ -52,7 +58,11 @@ const ViewportSync = ({ bounds }: { bounds?: LatLngBoundsExpression }) => {
     return null;
 };
 
-const MapView = ({ polygons = [] }: MapViewProps) => {
+const MapView = ({
+    imageOverlayOpacity = 0.8,
+    imageOverlayMode = 'post',
+    polygons = [],
+}: MapViewProps) => {
     const [imageOverlay, setImageOverlay] = useState<MapImageOverlay | null>(null);
 
     useEffect(() => {
@@ -62,7 +72,7 @@ const MapView = ({ polygons = [] }: MapViewProps) => {
             try {
                 const overlay = await loadImageOverlay({
                     dataUrl: OVERLAY_DATA_URL,
-                    imageUrl: OVERLAY_IMAGE_URL,
+                    imageUrl: OVERLAY_IMAGE_URL_BY_MODE.post,
                     adapter: defaultOverlayJsonAdapter,
                 });
 
@@ -85,6 +95,9 @@ const MapView = ({ polygons = [] }: MapViewProps) => {
     }, []);
 
     const mapBounds = imageOverlay?.bounds as LatLngBoundsExpression | undefined;
+    const activeOverlayImageUrl =
+        imageOverlayMode === 'none' ? null : OVERLAY_IMAGE_URL_BY_MODE[imageOverlayMode];
+
     return (
         <MapContainer
             center={DEFAULT_CENTER}
@@ -97,11 +110,11 @@ const MapView = ({ polygons = [] }: MapViewProps) => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <ViewportSync bounds={mapBounds} />
-            {imageOverlay ? (
+            {imageOverlay && activeOverlayImageUrl ? (
                 <ImageOverlay
-                    url={imageOverlay.imageUrl}
+                    url={activeOverlayImageUrl}
                     bounds={imageOverlay.bounds}
-                    opacity={0.8}
+                    opacity={imageOverlayOpacity}
                 />
             ) : null}
             <PolygonLayer polygons={polygons} />
