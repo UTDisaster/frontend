@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 
 import type { LatLngExpression } from 'leaflet';
-import { MapContainer, Polygon, TileLayer } from 'react-leaflet';
+import { MapContainer, Polygon, Popup, TileLayer } from 'react-leaflet';
 
 import type { MapPolygon } from './types';
 
@@ -18,12 +18,21 @@ const SAMPLE_POLYGONS: MapPolygon[] = [
             [30.28, -97.73],
             [30.27, -97.73],
         ],
+        area: 'Austin, TX',
+        classification: 'Major',
+        notes: 'Roof damage, standing water observed.',
     },
 ];
 
 interface MapViewProps {
     polygons?: MapPolygon[];
 }
+
+const formatLatLng = (coords: [number, number][]): string => {
+    if (coords.length === 0) return '—';
+    const [lat, lng] = coords[0];
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+};
 
 const PolygonLayer = ({ polygons }: { polygons: MapPolygon[] }) => {
     if (polygons.length === 0) return null;
@@ -40,7 +49,31 @@ const PolygonLayer = ({ polygons }: { polygons: MapPolygon[] }) => {
                         fillOpacity: 0.25,
                         weight: 2,
                     }}
-                />
+                >
+                    <Popup>
+                        <div className="min-w-[180px] text-sm text-slate-900">
+                            <p className="font-semibold">
+                                {formatLatLng(poly.coordinates)}
+                            </p>
+                            {poly.area != null && (
+                                <p className="text-slate-600">{poly.area}</p>
+                            )}
+                            {poly.classification != null && (
+                                <p>
+                                    <span className="text-slate-500">
+                                        Classification:
+                                    </span>{' '}
+                                    {poly.classification}
+                                </p>
+                            )}
+                            {poly.notes != null && (
+                                <p className="mt-1 text-slate-600">
+                                    {poly.notes}
+                                </p>
+                            )}
+                        </div>
+                    </Popup>
+                </Polygon>
             ))}
         </>
     );
