@@ -26,7 +26,10 @@ const Dashboard = () => {
                 </ErrorBoundary>
             </div>
 
-            <ControlPanel onMenuClick={() => setIsSidebarOpen(true)} />
+            <ControlPanel
+                isSidebarOpen={isSidebarOpen}
+                onMenuClick={() => setIsSidebarOpen(true)}
+            />
             <DashboardSidebar
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}

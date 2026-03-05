@@ -17,13 +17,7 @@ npm run build
 
 ## Environment (optional)
 
-For live chat and API, set in `.env`:
-
-- `VITE_API_BASE_URL` – API base URL (e.g. `https://api.example.com`). If set, chat WebSocket URL is derived as `{api}/chat/ws` unless overridden.
-- `VITE_CHAT_WS_URL` – Override chat WebSocket URL (e.g. `wss://api.example.com/chat/ws`).
-- `VITE_CHAT_MODE` – `mock` (default), `live`, or `auto` (try live, fallback to mock).
-
-Leave unset to use mock chat only.
+- `VITE_API_BASE_URL` – API base URL for optional REST history (e.g. GET /chat/conversations, GET /chat/:id). Leave unset to use mock chat history. Chat sending is mock-only until the backend defines a real-time API.
 
 ## Project structure
 
