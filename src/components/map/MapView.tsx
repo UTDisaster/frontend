@@ -112,14 +112,14 @@ const SAMPLE_POLYGONS: MapPolygon[] = [
     {
         id: "area-1",
         coordinates: [
-            [30.27, -97.75],
-            [30.28, -97.75],
-            [30.28, -97.73],
-            [30.27, -97.73],
+            [33.6065, -79.0415],
+            [33.6115, -79.0415],
+            [33.6115, -79.0335],
+            [33.6065, -79.0335],
         ],
-        area: "Austin, TX",
+        area: "Myrtle Beach, SC",
         classification: "Major",
-        notes: "Roof damage, standing water observed.",
+        notes: "Sample polygon near expected imagery extent.",
     },
 ];
 
