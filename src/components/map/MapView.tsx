@@ -1,17 +1,31 @@
-import 'leaflet/dist/leaflet.css';
+import "leaflet/dist/leaflet.css";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { LatLngBoundsExpression, LatLngExpression, LatLngBounds } from 'leaflet';
-import { ImageOverlay, MapContainer, Polygon, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+    LatLngBounds,
+    LatLngBoundsExpression,
+    LatLngExpression,
+} from "leaflet";
+import {
+    ImageOverlay,
+    MapContainer,
+    Polygon,
+    Popup,
+    TileLayer,
+    useMap,
+    useMapEvents,
+} from "react-leaflet";
 
-import type { ImageOverlayMode } from '@components/controls/ControlPanel';
-import type { MapPolygon } from './types';
+import type { ImageOverlayMode } from "@components/controls/ControlPanel";
+import type { MapPolygon } from "./types";
 
 const DEFAULT_CENTER: [number, number] = [33.6036, -79.0346];
 const DEFAULT_ZOOM = 15;
 const API_BASE_URL =
-    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
-    'http://127.0.0.1:8000';
+    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(
+        /\/$/,
+        "",
+    ) || "http://127.0.0.1:8000";
 
 interface ViewportBBox {
     maxLat: number;
@@ -59,7 +73,9 @@ const boundsToBbox = (bounds: LatLngBounds): ViewportBBox => ({
     maxLat: bounds.getNorth(),
 });
 
-const normalizeBounds = (bounds?: OverlayBounds | null): LatLngBoundsExpression | null => {
+const normalizeBounds = (
+    bounds?: OverlayBounds | null,
+): LatLngBoundsExpression | null => {
     if (!bounds || bounds.length !== 2) return null;
 
     const [[minLat, minLng], [maxLat, maxLng]] = bounds;
@@ -85,10 +101,32 @@ const buildImagePairQuery = (bbox: ViewportBBox): string => {
         min_lat: String(bbox.minLat),
         max_lng: String(bbox.maxLng),
         max_lat: String(bbox.maxLat),
-        limit: '2000',
+        limit: "2000",
     });
 
     return `${API_BASE_URL}/image-pairs?${params.toString()}`;
+};
+
+/** Sample polygons for demo; replace with API or props later. */
+const SAMPLE_POLYGONS: MapPolygon[] = [
+    {
+        id: "area-1",
+        coordinates: [
+            [30.27, -97.75],
+            [30.28, -97.75],
+            [30.28, -97.73],
+            [30.27, -97.73],
+        ],
+        area: "Austin, TX",
+        classification: "Major",
+        notes: "Roof damage, standing water observed.",
+    },
+];
+
+const formatLatLng = (coords: [number, number][]): string => {
+    if (coords.length === 0) return "-";
+    const [lat, lng] = coords[0];
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 };
 
 const ViewportWatcher = ({ onViewportChange }: ViewportWatcherProps) => {
@@ -116,12 +154,36 @@ const PolygonLayer = ({ polygons }: { polygons: MapPolygon[] }) => {
                     key={poly.id}
                     positions={poly.coordinates as LatLngExpression[]}
                     pathOptions={{
-                        color: '#0f172a',
-                        fillColor: '#334155',
+                        color: "#0f172a",
+                        fillColor: "#334155",
                         fillOpacity: 0.25,
                         weight: 2,
                     }}
-                />
+                >
+                    <Popup>
+                        <div className="min-w-[180px] text-sm text-slate-900">
+                            <p className="font-semibold">
+                                {formatLatLng(poly.coordinates)}
+                            </p>
+                            {poly.area != null && (
+                                <p className="text-slate-600">{poly.area}</p>
+                            )}
+                            {poly.classification != null && (
+                                <p>
+                                    <span className="text-slate-500">
+                                        Classification:
+                                    </span>{" "}
+                                    {poly.classification}
+                                </p>
+                            )}
+                            {poly.notes != null && (
+                                <p className="mt-1 text-slate-600">
+                                    {poly.notes}
+                                </p>
+                            )}
+                        </div>
+                    </Popup>
+                </Polygon>
             ))}
         </>
     );
@@ -135,9 +197,10 @@ interface MapViewProps {
 
 const MapView = ({
     imageOverlayOpacity = 0.8,
-    imageOverlayMode = 'post',
+    imageOverlayMode = "post",
     polygons = [],
 }: MapViewProps) => {
+    const polygonsToRender = polygons.length > 0 ? polygons : SAMPLE_POLYGONS;
     const [bbox, setBbox] = useState<ViewportBBox | null>(null);
     const [imagePairs, setImagePairs] = useState<RenderableImagePair[]>([]);
     const requestAbortRef = useRef<AbortController | null>(null);
@@ -156,11 +219,15 @@ const MapView = ({
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch image pairs (${response.status})`);
+                    throw new Error(
+                        `Failed to fetch image pairs (${response.status})`,
+                    );
                 }
 
                 const payload = (await response.json()) as ApiImagePairResponse;
-                const overlays: RenderableImagePair[] = (payload.image_pairs ?? [])
+                const overlays: RenderableImagePair[] = (
+                    payload.image_pairs ?? []
+                )
                     .map((pair) => {
                         const preBounds = normalizeBounds(pair.pre_bounds);
                         const postBounds = normalizeBounds(pair.post_bounds);
@@ -175,12 +242,14 @@ const MapView = ({
                             post_bounds: postBounds,
                         };
                     })
-                    .filter((pair): pair is RenderableImagePair => pair !== null);
+                    .filter(
+                        (pair): pair is RenderableImagePair => pair !== null,
+                    );
 
                 setImagePairs(overlays);
             } catch (error) {
                 if (controller.signal.aborted) return;
-                console.error('Failed to fetch image pairs:', error);
+                console.error("Failed to fetch image pairs:", error);
                 setImagePairs([]);
             }
         };
@@ -193,18 +262,24 @@ const MapView = ({
     }, [bbox]);
 
     const visibleOverlays = useMemo(() => {
-        if (imageOverlayMode === 'none') {
+        if (imageOverlayMode === "none") {
             return [];
         }
 
         return imagePairs
             .map((pair) => ({
                 id: pair.image_pair_id,
-                bounds: imageOverlayMode === 'pre' ? pair.pre_bounds : pair.post_bounds,
-                url: imageOverlayMode === 'pre' ? pair.pre_url : pair.post_url,
+                bounds:
+                    imageOverlayMode === "pre"
+                        ? pair.pre_bounds
+                        : pair.post_bounds,
+                url: imageOverlayMode === "pre" ? pair.pre_url : pair.post_url,
             }))
-            .filter((pair): pair is VisibleOverlay =>
-                typeof pair.url === 'string' && pair.url.length > 0 && pair.bounds !== null,
+            .filter(
+                (pair): pair is VisibleOverlay =>
+                    typeof pair.url === "string" &&
+                    pair.url.length > 0 &&
+                    pair.bounds !== null,
             );
     }, [imageOverlayMode, imagePairs]);
 
@@ -224,12 +299,12 @@ const MapView = ({
             {visibleOverlays.map((overlay) => (
                 <ImageOverlay
                     key={`${overlay.id}-${overlay.url}`}
-                    url={overlay.url as string}
+                    url={overlay.url}
                     bounds={overlay.bounds}
                     opacity={imageOverlayOpacity}
                 />
             ))}
-            <PolygonLayer polygons={polygons} />
+            <PolygonLayer polygons={polygonsToRender} />
         </MapContainer>
     );
 };
