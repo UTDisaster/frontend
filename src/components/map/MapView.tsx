@@ -107,22 +107,6 @@ const buildImagePairQuery = (bbox: ViewportBBox): string => {
     return `${API_BASE_URL}/image-pairs?${params.toString()}`;
 };
 
-/** Sample polygons for demo; replace with API or props later. */
-const SAMPLE_POLYGONS: MapPolygon[] = [
-    {
-        id: "area-1",
-        coordinates: [
-            [33.6065, -79.0415],
-            [33.6115, -79.0415],
-            [33.6115, -79.0335],
-            [33.6065, -79.0335],
-        ],
-        area: "Myrtle Beach, SC",
-        classification: "Major",
-        notes: "Sample polygon near expected imagery extent.",
-    },
-];
-
 const formatLatLng = (coords: [number, number][]): string => {
     if (coords.length === 0) return "-";
     const [lat, lng] = coords[0];
@@ -231,11 +215,7 @@ const MapView = ({
     onViewportChange,
     disablePolygons = false,
 }: MapViewProps) => {
-    const polygonsToRender = disablePolygons
-        ? []
-        : polygons.length > 0
-            ? polygons
-            : SAMPLE_POLYGONS;
+    const polygonsToRender = disablePolygons ? [] : polygons;
     const [bbox, setBbox] = useState<ViewportBBox | null>(null);
     const [imagePairs, setImagePairs] = useState<RenderableImagePair[]>([]);
     const requestAbortRef = useRef<AbortController | null>(null);
