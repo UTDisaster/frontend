@@ -9,7 +9,7 @@ import ControlPanel, {
 import DashboardSidebar from "@components/dashboard/DashboardSidebar";
 import ErrorBoundary from "@components/ErrorBoundary";
 import MapView, { type ViewportBBox } from "@components/map/MapView";
-import type { MapPolygon } from "@components/map/types";
+import { normalizeClassification, type MapPolygon } from "@components/map/types";
 
 const API_BASE_FALLBACK = "http://127.0.0.1:8000";
 
@@ -124,10 +124,10 @@ const Dashboard = () => {
     const [disableAllArtifacts, setDisableAllArtifacts] = useState(false);
     const [locationToggles, setLocationToggles] = useState<LocationToggleState>(
         {
+            destroyed: true,
+            minor: true,
             unknown: true,
             none: true,
-            some: true,
-            moderate: true,
             severe: true,
         },
     );
@@ -162,6 +162,11 @@ const Dashboard = () => {
         return () => controller.abort();
     }, [viewport]);
 
+    const visiblePolygons = polygons.filter((polygon) => {
+        const key = normalizeClassification(polygon.classification ?? null);
+        return locationToggles[key];
+    });
+
     return (
         <div className="relative min-h-screen h-full w-full overflow-hidden text-slate-950">
             <div className="absolute inset-0 z-0">
@@ -176,8 +181,9 @@ const Dashboard = () => {
                     <MapView
                         imageOverlayMode={imageOverlayMode}
                         imageOverlayOpacity={imageOverlayOpacity}
-                        polygons={polygons}
+                        polygons={visiblePolygons}
                         onViewportChange={setViewport}
+                        disablePolygons={disableAllArtifacts}
                     />
                 </ErrorBoundary>
             </div>

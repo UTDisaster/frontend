@@ -17,7 +17,7 @@ import {
 } from "react-leaflet";
 
 import type { ImageOverlayMode } from "@components/controls/ControlPanel";
-import type { MapPolygon } from "./types";
+import { normalizeClassification, type MapPolygon } from "./types";
 
 const DEFAULT_CENTER: [number, number] = [33.6036, -79.0346];
 const DEFAULT_ZOOM = 15;
@@ -129,6 +129,17 @@ const formatLatLng = (coords: [number, number][]): string => {
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 };
 
+const classificationColors: Record<
+    ReturnType<typeof normalizeClassification>,
+    { stroke: string; fill: string }
+> = {
+    unknown: { stroke: "#475569", fill: "#94a3b8" },
+    none: { stroke: "#15803d", fill: "#22c55e" },
+    minor: { stroke: "#ca8a04", fill: "#facc15" },
+    severe: { stroke: "#ea580c", fill: "#f97316" },
+    destroyed: { stroke: "#b91c1c", fill: "#ef4444" },
+};
+
 const isSameBbox = (a: ViewportBBox | null, b: ViewportBBox) =>
     !!a &&
     a.minLat === b.minLat &&
@@ -157,42 +168,51 @@ const PolygonLayer = ({ polygons }: { polygons: MapPolygon[] }) => {
     return (
         <>
             {polygons.map((poly) => (
-                <Polygon
-                    key={poly.id}
-                    positions={poly.coordinates as LatLngExpression[]}
-                    pathOptions={{
-                        color: "#0f172a",
-                        fillColor: "#334155",
-                        fillOpacity: 0.25,
-                        weight: 2,
-                    }}
-                >
-                    <Popup>
-                        <div className="min-w-[180px] text-sm text-slate-900">
-                            <p className="font-semibold">
-                                {formatLatLng(poly.coordinates)}
-                            </p>
-                            {poly.area != null && (
-                                <p className="text-slate-600">{poly.area}</p>
-                            )}
-                            {poly.classification != null && (
-                                <p>
-                                    <span className="text-slate-500">
-                                        Classification:
-                                    </span>{" "}
-                                    {poly.classification}
-                                </p>
-                            )}
-                            {poly.notes != null && (
-                                <p className="mt-1 text-slate-600">
-                                    {poly.notes}
-                                </p>
-                            )}
-                        </div>
-                    </Popup>
-                </Polygon>
+                <PolygonWithStyle key={poly.id} polygon={poly} />
             ))}
         </>
+    );
+};
+
+const PolygonWithStyle = ({ polygon }: { polygon: MapPolygon }) => {
+    const classificationKey = normalizeClassification(
+        polygon.classification ?? null,
+    );
+    const colors = classificationColors[classificationKey];
+
+    return (
+        <Polygon
+            key={polygon.id}
+            positions={polygon.coordinates as LatLngExpression[]}
+            pathOptions={{
+                color: colors.stroke,
+                fillColor: colors.fill,
+                fillOpacity: 0.3,
+                weight: 2,
+            }}
+        >
+            <Popup>
+                <div className="min-w-[180px] text-sm text-slate-900">
+                    <p className="font-semibold">
+                        {formatLatLng(polygon.coordinates)}
+                    </p>
+                    {polygon.area != null && (
+                        <p className="text-slate-600">{polygon.area}</p>
+                    )}
+                    {polygon.classification != null && (
+                        <p>
+                            <span className="text-slate-500">
+                                Classification:
+                            </span>{" "}
+                            {polygon.classification}
+                        </p>
+                    )}
+                    {polygon.notes != null && (
+                        <p className="mt-1 text-slate-600">{polygon.notes}</p>
+                    )}
+                </div>
+            </Popup>
+        </Polygon>
     );
 };
 
@@ -201,6 +221,7 @@ interface MapViewProps {
     imageOverlayMode?: ImageOverlayMode;
     polygons?: MapPolygon[];
     onViewportChange?: (bbox: ViewportBBox) => void;
+    disablePolygons?: boolean;
 }
 
 const MapView = ({
@@ -208,8 +229,13 @@ const MapView = ({
     imageOverlayMode = "post",
     polygons = [],
     onViewportChange,
+    disablePolygons = false,
 }: MapViewProps) => {
-    const polygonsToRender = polygons.length > 0 ? polygons : SAMPLE_POLYGONS;
+    const polygonsToRender = disablePolygons
+        ? []
+        : polygons.length > 0
+            ? polygons
+            : SAMPLE_POLYGONS;
     const [bbox, setBbox] = useState<ViewportBBox | null>(null);
     const [imagePairs, setImagePairs] = useState<RenderableImagePair[]>([]);
     const requestAbortRef = useRef<AbortController | null>(null);
