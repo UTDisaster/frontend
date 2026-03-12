@@ -1,6 +1,6 @@
 import "leaflet/dist/leaflet.css";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
     LatLngBounds,
     LatLngBoundsExpression,
@@ -27,7 +27,7 @@ const API_BASE_URL =
         "",
     ) || "http://127.0.0.1:8000";
 
-interface ViewportBBox {
+export interface ViewportBBox {
     maxLat: number;
     maxLng: number;
     minLat: number;
@@ -129,6 +129,13 @@ const formatLatLng = (coords: [number, number][]): string => {
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 };
 
+const isSameBbox = (a: ViewportBBox | null, b: ViewportBBox) =>
+    !!a &&
+    a.minLat === b.minLat &&
+    a.minLng === b.minLng &&
+    a.maxLat === b.maxLat &&
+    a.maxLng === b.maxLng;
+
 const ViewportWatcher = ({ onViewportChange }: ViewportWatcherProps) => {
     const map = useMap();
 
@@ -193,17 +200,30 @@ interface MapViewProps {
     imageOverlayOpacity?: number;
     imageOverlayMode?: ImageOverlayMode;
     polygons?: MapPolygon[];
+    onViewportChange?: (bbox: ViewportBBox) => void;
 }
 
 const MapView = ({
     imageOverlayOpacity = 0.8,
     imageOverlayMode = "post",
     polygons = [],
+    onViewportChange,
 }: MapViewProps) => {
     const polygonsToRender = polygons.length > 0 ? polygons : SAMPLE_POLYGONS;
     const [bbox, setBbox] = useState<ViewportBBox | null>(null);
     const [imagePairs, setImagePairs] = useState<RenderableImagePair[]>([]);
     const requestAbortRef = useRef<AbortController | null>(null);
+    const bboxRef = useRef<ViewportBBox | null>(null);
+
+    const handleViewportChange = useCallback(
+        (nextBbox: ViewportBBox) => {
+            if (isSameBbox(bboxRef.current, nextBbox)) return;
+            bboxRef.current = nextBbox;
+            setBbox(nextBbox);
+            onViewportChange?.(nextBbox);
+        },
+        [onViewportChange],
+    );
 
     useEffect(() => {
         if (!bbox) return;
@@ -295,7 +315,7 @@ const MapView = ({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <ViewportWatcher onViewportChange={setBbox} />
+            <ViewportWatcher onViewportChange={handleViewportChange} />
             {visibleOverlays.map((overlay) => (
                 <ImageOverlay
                     key={`${overlay.id}-${overlay.url}`}
