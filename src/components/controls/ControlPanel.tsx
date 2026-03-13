@@ -5,10 +5,10 @@ import { Layers, Menu } from "lucide-react";
 export type ImageOverlayMode = "pre" | "post" | "none";
 
 export interface LocationToggleState {
-    moderate: boolean;
+    destroyed: boolean;
+    minor: boolean;
     none: boolean;
     severe: boolean;
-    some: boolean;
     unknown: boolean;
 }
 
@@ -41,9 +41,9 @@ const locationOptions: {
 }[] = [
     { key: "unknown", label: "Unknown", colorClass: "bg-slate-400" },
     { key: "none", label: "None", colorClass: "bg-green-500" },
-    { key: "some", label: "Some", colorClass: "bg-yellow-400" },
-    { key: "moderate", label: "Moderate", colorClass: "bg-orange-500" },
-    { key: "severe", label: "Severe", colorClass: "bg-red-500" },
+    { key: "minor", label: "Minor", colorClass: "bg-yellow-400" },
+    { key: "severe", label: "Severe", colorClass: "bg-orange-500" },
+    { key: "destroyed", label: "Destroyed", colorClass: "bg-red-500" },
 ];
 
 const ControlPanel = ({

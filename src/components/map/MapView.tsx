@@ -1,6 +1,6 @@
 import "leaflet/dist/leaflet.css";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
     LatLngBounds,
     LatLngBoundsExpression,
@@ -17,7 +17,7 @@ import {
 } from "react-leaflet";
 
 import type { ImageOverlayMode } from "@components/controls/ControlPanel";
-import type { MapPolygon } from "./types";
+import { normalizeClassification, type MapPolygon } from "./types";
 
 const DEFAULT_CENTER: [number, number] = [33.6036, -79.0346];
 const DEFAULT_ZOOM = 15;
@@ -27,7 +27,7 @@ const API_BASE_URL =
         "",
     ) || "http://127.0.0.1:8000";
 
-interface ViewportBBox {
+export interface ViewportBBox {
     maxLat: number;
     maxLng: number;
     minLat: number;
@@ -107,27 +107,29 @@ const buildImagePairQuery = (bbox: ViewportBBox): string => {
     return `${API_BASE_URL}/image-pairs?${params.toString()}`;
 };
 
-/** Sample polygons for demo; replace with API or props later. */
-const SAMPLE_POLYGONS: MapPolygon[] = [
-    {
-        id: "area-1",
-        coordinates: [
-            [33.6065, -79.0415],
-            [33.6115, -79.0415],
-            [33.6115, -79.0335],
-            [33.6065, -79.0335],
-        ],
-        area: "Myrtle Beach, SC",
-        classification: "Major",
-        notes: "Sample polygon near expected imagery extent.",
-    },
-];
-
 const formatLatLng = (coords: [number, number][]): string => {
     if (coords.length === 0) return "-";
     const [lat, lng] = coords[0];
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 };
+
+const classificationColors: Record<
+    ReturnType<typeof normalizeClassification>,
+    { stroke: string; fill: string }
+> = {
+    unknown: { stroke: "#475569", fill: "#94a3b8" },
+    none: { stroke: "#15803d", fill: "#22c55e" },
+    minor: { stroke: "#ca8a04", fill: "#facc15" },
+    severe: { stroke: "#ea580c", fill: "#f97316" },
+    destroyed: { stroke: "#b91c1c", fill: "#ef4444" },
+};
+
+const isSameBbox = (a: ViewportBBox | null, b: ViewportBBox) =>
+    !!a &&
+    a.minLat === b.minLat &&
+    a.minLng === b.minLng &&
+    a.maxLat === b.maxLat &&
+    a.maxLng === b.maxLng;
 
 const ViewportWatcher = ({ onViewportChange }: ViewportWatcherProps) => {
     const map = useMap();
@@ -150,42 +152,51 @@ const PolygonLayer = ({ polygons }: { polygons: MapPolygon[] }) => {
     return (
         <>
             {polygons.map((poly) => (
-                <Polygon
-                    key={poly.id}
-                    positions={poly.coordinates as LatLngExpression[]}
-                    pathOptions={{
-                        color: "#0f172a",
-                        fillColor: "#334155",
-                        fillOpacity: 0.25,
-                        weight: 2,
-                    }}
-                >
-                    <Popup>
-                        <div className="min-w-[180px] text-sm text-slate-900">
-                            <p className="font-semibold">
-                                {formatLatLng(poly.coordinates)}
-                            </p>
-                            {poly.area != null && (
-                                <p className="text-slate-600">{poly.area}</p>
-                            )}
-                            {poly.classification != null && (
-                                <p>
-                                    <span className="text-slate-500">
-                                        Classification:
-                                    </span>{" "}
-                                    {poly.classification}
-                                </p>
-                            )}
-                            {poly.notes != null && (
-                                <p className="mt-1 text-slate-600">
-                                    {poly.notes}
-                                </p>
-                            )}
-                        </div>
-                    </Popup>
-                </Polygon>
+                <PolygonWithStyle key={poly.id} polygon={poly} />
             ))}
         </>
+    );
+};
+
+const PolygonWithStyle = ({ polygon }: { polygon: MapPolygon }) => {
+    const classificationKey = normalizeClassification(
+        polygon.classification ?? null,
+    );
+    const colors = classificationColors[classificationKey];
+
+    return (
+        <Polygon
+            key={polygon.id}
+            positions={polygon.coordinates as LatLngExpression[]}
+            pathOptions={{
+                color: colors.stroke,
+                fillColor: colors.fill,
+                fillOpacity: 0.3,
+                weight: 2,
+            }}
+        >
+            <Popup>
+                <div className="min-w-[180px] text-sm text-slate-900">
+                    <p className="font-semibold">
+                        {formatLatLng(polygon.coordinates)}
+                    </p>
+                    {polygon.area != null && (
+                        <p className="text-slate-600">{polygon.area}</p>
+                    )}
+                    {polygon.classification != null && (
+                        <p>
+                            <span className="text-slate-500">
+                                Classification:
+                            </span>{" "}
+                            {polygon.classification}
+                        </p>
+                    )}
+                    {polygon.notes != null && (
+                        <p className="mt-1 text-slate-600">{polygon.notes}</p>
+                    )}
+                </div>
+            </Popup>
+        </Polygon>
     );
 };
 
@@ -193,17 +204,32 @@ interface MapViewProps {
     imageOverlayOpacity?: number;
     imageOverlayMode?: ImageOverlayMode;
     polygons?: MapPolygon[];
+    onViewportChange?: (bbox: ViewportBBox) => void;
+    disablePolygons?: boolean;
 }
 
 const MapView = ({
     imageOverlayOpacity = 0.8,
     imageOverlayMode = "post",
     polygons = [],
+    onViewportChange,
+    disablePolygons = false,
 }: MapViewProps) => {
-    const polygonsToRender = polygons.length > 0 ? polygons : SAMPLE_POLYGONS;
+    const polygonsToRender = disablePolygons ? [] : polygons;
     const [bbox, setBbox] = useState<ViewportBBox | null>(null);
     const [imagePairs, setImagePairs] = useState<RenderableImagePair[]>([]);
     const requestAbortRef = useRef<AbortController | null>(null);
+    const bboxRef = useRef<ViewportBBox | null>(null);
+
+    const handleViewportChange = useCallback(
+        (nextBbox: ViewportBBox) => {
+            if (isSameBbox(bboxRef.current, nextBbox)) return;
+            bboxRef.current = nextBbox;
+            setBbox(nextBbox);
+            onViewportChange?.(nextBbox);
+        },
+        [onViewportChange],
+    );
 
     useEffect(() => {
         if (!bbox) return;
@@ -295,7 +321,7 @@ const MapView = ({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <ViewportWatcher onViewportChange={setBbox} />
+            <ViewportWatcher onViewportChange={handleViewportChange} />
             {visibleOverlays.map((overlay) => (
                 <ImageOverlay
                     key={`${overlay.id}-${overlay.url}`}
