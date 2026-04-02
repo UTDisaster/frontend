@@ -139,6 +139,14 @@ interface BoundsRect {
 }
 
 const toBoundsRect = (bounds: LatLngBoundsExpression): BoundsRect => {
+    if (!Array.isArray(bounds)) {
+        return {
+            minLat: bounds.getSouth(),
+            minLng: bounds.getWest(),
+            maxLat: bounds.getNorth(),
+            maxLng: bounds.getEast(),
+        };
+    }
     const [[minLat, minLng], [maxLat, maxLng]] = bounds as [
         [number, number],
         [number, number],
@@ -151,61 +159,72 @@ const fromBoundsRect = (r: BoundsRect): LatLngBoundsExpression => [
     [r.maxLat, r.maxLng],
 ];
 
+const clipAdjacentPair = (a: BoundsRect, b: BoundsRect): void => {
+    if (
+        a.minLat >= b.maxLat ||
+        a.maxLat <= b.minLat ||
+        a.minLng >= b.maxLng ||
+        a.maxLng <= b.minLng
+    ) {
+        return;
+    }
+
+    const overlapLat =
+        Math.min(a.maxLat, b.maxLat) - Math.max(a.minLat, b.minLat);
+    const overlapLng =
+        Math.min(a.maxLng, b.maxLng) - Math.max(a.minLng, b.minLng);
+
+    if (overlapLat <= overlapLng) {
+        const midLat =
+            (Math.max(a.minLat, b.minLat) + Math.min(a.maxLat, b.maxLat)) / 2;
+        if (a.minLat < b.minLat) {
+            a.maxLat = midLat;
+            b.minLat = midLat;
+        } else {
+            b.maxLat = midLat;
+            a.minLat = midLat;
+        }
+    } else {
+        const midLng =
+            (Math.max(a.minLng, b.minLng) + Math.min(a.maxLng, b.maxLng)) / 2;
+        if (a.minLng < b.minLng) {
+            a.maxLng = midLng;
+            b.minLng = midLng;
+        } else {
+            b.maxLng = midLng;
+            a.minLng = midLng;
+        }
+    }
+};
+
 const clipOverlappingOverlays = (
     overlays: VisibleOverlay[],
 ): VisibleOverlay[] => {
     if (overlays.length <= 1) return overlays;
 
-    const rects = overlays.map((o) => toBoundsRect(o.bounds));
+    const indexed = overlays.map((o, idx) => ({
+        idx,
+        rect: toBoundsRect(o.bounds),
+    }));
 
-    for (let i = 0; i < rects.length; i++) {
-        for (let j = i + 1; j < rects.length; j++) {
-            const a = rects[i];
-            const b = rects[j];
+    indexed.sort((a, b) => a.rect.minLng - b.rect.minLng);
 
-            if (
-                a.minLat >= b.maxLat ||
-                a.maxLat <= b.minLat ||
-                a.minLng >= b.maxLng ||
-                a.maxLng <= b.minLng
-            ) {
-                continue;
-            }
-
-            const overlapLat =
-                Math.min(a.maxLat, b.maxLat) - Math.max(a.minLat, b.minLat);
-            const overlapLng =
-                Math.min(a.maxLng, b.maxLng) - Math.max(a.minLng, b.minLng);
-
-            if (overlapLat <= overlapLng) {
-                const midLat =
-                    (Math.max(a.minLat, b.minLat) +
-                        Math.min(a.maxLat, b.maxLat)) /
-                    2;
-                if (a.minLat < b.minLat) {
-                    a.maxLat = midLat;
-                    b.minLat = midLat;
-                } else {
-                    b.maxLat = midLat;
-                    a.minLat = midLat;
-                }
-            } else {
-                const midLng =
-                    (Math.max(a.minLng, b.minLng) +
-                        Math.min(a.maxLng, b.maxLng)) /
-                    2;
-                if (a.minLng < b.minLng) {
-                    a.maxLng = midLng;
-                    b.minLng = midLng;
-                } else {
-                    b.maxLng = midLng;
-                    a.minLng = midLng;
-                }
-            }
+    for (let i = 0; i < indexed.length - 1; i++) {
+        for (
+            let j = i + 1;
+            j < indexed.length &&
+            indexed[j].rect.minLng < indexed[i].rect.maxLng;
+            j++
+        ) {
+            clipAdjacentPair(indexed[i].rect, indexed[j].rect);
         }
     }
 
-    return overlays.map((o, i) => ({ ...o, bounds: fromBoundsRect(rects[i]) }));
+    const result = [...overlays];
+    for (const { idx, rect } of indexed) {
+        result[idx] = { ...overlays[idx], bounds: fromBoundsRect(rect) };
+    }
+    return result;
 };
 
 const ViewportWatcher = ({ onViewportChange }: ViewportWatcherProps) => {
