@@ -95,13 +95,16 @@ const ControlPanel = ({
                                shadow-md backdrop-blur-md
                                transition hover:-translate-y-0.5 hover:shadow-lg
                                pointer-events-auto"
-                    onClick={onMenuClick}
+                    onClick={() => {
+                        setIsOverlayMenuOpen(false);
+                        onMenuClick?.();
+                    }}
                     aria-label="Open menu"
                 >
                     <Menu className="h-6 w-6 text-slate-900" />
                 </button>
             )}
-            <div
+            {!isSidebarOpen && <div
                 ref={overlayMenuRef}
                 className="relative flex items-center gap-2
                                         p-2
@@ -119,6 +122,7 @@ const ControlPanel = ({
                                transition hover:bg-white/90 hover:text-blue-600"
                     onClick={() => setIsOverlayMenuOpen((open) => !open)}
                     aria-expanded={isOverlayMenuOpen}
+                    aria-haspopup="true"
                     aria-controls="overlays-popup-menu"
                 >
                     <Layers className="h-4 w-4" />
@@ -266,7 +270,7 @@ const ControlPanel = ({
                         </section>
                     </div>
                 ) : null}
-            </div>
+            </div>}
         </div>
     );
 };
