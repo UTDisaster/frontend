@@ -1,5 +1,5 @@
 import { ChevronDown, Info, MapPin } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
     normalizeClassification,
@@ -16,6 +16,14 @@ interface DashboardSidebarProps {
 
 const DISASTERS = [
     { id: "myrtle-beach", label: "Hurricane — Myrtle Beach, SC" },
+];
+
+const CLASSIFICATION_ORDER: ClassificationKey[] = [
+    "destroyed",
+    "severe",
+    "minor",
+    "none",
+    "unknown",
 ];
 
 const classificationLabels: Record<ClassificationKey, string> = {
@@ -56,11 +64,29 @@ const DashboardSidebar = ({
 }: DashboardSidebarProps) => {
     const [selectedDisaster, setSelectedDisaster] = useState(DISASTERS[0].id);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isDropdownOpen) return;
+
+        const handleClick = (e: MouseEvent) => {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(e.target as Node)
+            ) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [isDropdownOpen]);
+
+    const counts = useMemo(() => countByClassification(polygons), [polygons]);
 
     if (!isOpen) return null;
 
-    const selected = DISASTERS.find((d) => d.id === selectedDisaster) ?? DISASTERS[0];
-    const counts = countByClassification(polygons);
+    const selected =
+        DISASTERS.find((d) => d.id === selectedDisaster) ?? DISASTERS[0];
 
     return (
         <>
@@ -93,7 +119,10 @@ const DashboardSidebar = ({
 
                 <div className="flex-1 overflow-y-auto">
                     {/* Disaster selector */}
-                    <div className="border-b border-slate-200 px-4 py-3">
+                    <div
+                        ref={dropdownRef}
+                        className="border-b border-slate-200 px-4 py-3"
+                    >
                         <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
                             Disaster
                         </label>
@@ -106,8 +135,12 @@ const DashboardSidebar = ({
                                            transition hover:border-slate-400"
                                 onClick={() => setIsDropdownOpen((o) => !o)}
                                 aria-expanded={isDropdownOpen}
+                                aria-haspopup="listbox"
+                                aria-controls="disaster-listbox"
                             >
-                                <span className="truncate">{selected.label}</span>
+                                <span className="truncate">
+                                    {selected.label}
+                                </span>
                                 <ChevronDown
                                     className={`h-4 w-4 text-slate-500 transition ${
                                         isDropdownOpen ? "rotate-180" : ""
@@ -115,11 +148,21 @@ const DashboardSidebar = ({
                                 />
                             </button>
                             {isDropdownOpen && (
-                                <ul className="absolute left-0 right-0 top-full z-10 mt-1
+                                <ul
+                                    id="disaster-listbox"
+                                    role="listbox"
+                                    className="absolute left-0 right-0 top-full z-10 mt-1
                                                rounded-lg border border-slate-200 bg-white
-                                               py-1 shadow-lg">
+                                               py-1 shadow-lg"
+                                >
                                     {DISASTERS.map((d) => (
-                                        <li key={d.id}>
+                                        <li
+                                            key={d.id}
+                                            role="option"
+                                            aria-selected={
+                                                d.id === selectedDisaster
+                                            }
+                                        >
                                             <button
                                                 type="button"
                                                 className={`w-full px-3 py-2 text-left text-sm transition hover:bg-slate-100 ${
@@ -181,7 +224,7 @@ const DashboardSidebar = ({
                                 {polygons.length} total locations
                             </p>
                             <ul className="space-y-1">
-                                {(Object.keys(counts) as ClassificationKey[]).map(
+                                {CLASSIFICATION_ORDER.map(
                                     (key) =>
                                         counts[key] > 0 && (
                                             <li
