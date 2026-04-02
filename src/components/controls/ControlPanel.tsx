@@ -62,6 +62,10 @@ const ControlPanel = ({
     const overlayMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
+        if (isSidebarOpen) setIsOverlayMenuOpen(false);
+    }, [isSidebarOpen]);
+
+    useEffect(() => {
         if (!isOverlayMenuOpen) return;
 
         const onPointerDown = (event: MouseEvent) => {
@@ -101,7 +105,7 @@ const ControlPanel = ({
                     <Menu className="h-6 w-6 text-slate-900" />
                 </button>
             )}
-            <div
+            {!isSidebarOpen && <div
                 ref={overlayMenuRef}
                 className="relative flex items-center gap-2
                                         p-2
@@ -266,7 +270,7 @@ const ControlPanel = ({
                         </section>
                     </div>
                 ) : null}
-            </div>
+            </div>}
         </div>
     );
 };
