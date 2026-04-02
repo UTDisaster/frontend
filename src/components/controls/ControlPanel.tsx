@@ -62,10 +62,6 @@ const ControlPanel = ({
     const overlayMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        if (isSidebarOpen) setIsOverlayMenuOpen(false);
-    }, [isSidebarOpen]);
-
-    useEffect(() => {
         if (!isOverlayMenuOpen) return;
 
         const onPointerDown = (event: MouseEvent) => {
@@ -99,7 +95,10 @@ const ControlPanel = ({
                                shadow-md backdrop-blur-md
                                transition hover:-translate-y-0.5 hover:shadow-lg
                                pointer-events-auto"
-                    onClick={onMenuClick}
+                    onClick={() => {
+                        setIsOverlayMenuOpen(false);
+                        onMenuClick?.();
+                    }}
                     aria-label="Open menu"
                 >
                     <Menu className="h-6 w-6 text-slate-900" />
@@ -123,6 +122,7 @@ const ControlPanel = ({
                                transition hover:bg-white/90 hover:text-blue-600"
                     onClick={() => setIsOverlayMenuOpen((open) => !open)}
                     aria-expanded={isOverlayMenuOpen}
+                    aria-haspopup="true"
                     aria-controls="overlays-popup-menu"
                 >
                     <Layers className="h-4 w-4" />
