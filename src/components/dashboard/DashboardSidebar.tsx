@@ -1,14 +1,92 @@
-import { MapPin } from 'lucide-react';
+import { ChevronDown, Info, MapPin } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import {
+    normalizeClassification,
+    type ClassificationKey,
+    type MapPolygon,
+} from "@components/map/types";
 
 interface DashboardSidebarProps {
     isOpen: boolean;
     onClose: () => void;
+    onDisasterInfoClick?: () => void;
+    polygons?: MapPolygon[];
 }
 
-const DashboardSidebar = ({ isOpen, onClose }: DashboardSidebarProps) => {
-    if (!isOpen) {
-        return null;
+const DISASTERS = [
+    { id: "myrtle-beach", label: "Hurricane — Myrtle Beach, SC" },
+];
+
+const CLASSIFICATION_ORDER: ClassificationKey[] = [
+    "destroyed",
+    "severe",
+    "minor",
+    "none",
+    "unknown",
+];
+
+const classificationLabels: Record<ClassificationKey, string> = {
+    destroyed: "Destroyed",
+    severe: "Severe",
+    minor: "Minor",
+    none: "No Damage",
+    unknown: "Unknown",
+};
+
+const classificationDots: Record<ClassificationKey, string> = {
+    destroyed: "bg-red-500",
+    severe: "bg-orange-500",
+    minor: "bg-yellow-400",
+    none: "bg-green-500",
+    unknown: "bg-slate-400",
+};
+
+const countByClassification = (polygons: MapPolygon[]) => {
+    const counts: Record<ClassificationKey, number> = {
+        destroyed: 0,
+        severe: 0,
+        minor: 0,
+        none: 0,
+        unknown: 0,
+    };
+    for (const p of polygons) {
+        counts[normalizeClassification(p.classification ?? null)] += 1;
     }
+    return counts;
+};
+
+const DashboardSidebar = ({
+    isOpen,
+    onClose,
+    onDisasterInfoClick,
+    polygons = [],
+}: DashboardSidebarProps) => {
+    const [selectedDisaster, setSelectedDisaster] = useState(DISASTERS[0].id);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isDropdownOpen) return;
+
+        const handleClick = (e: MouseEvent) => {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(e.target as Node)
+            ) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [isDropdownOpen]);
+
+    const counts = useMemo(() => countByClassification(polygons), [polygons]);
+
+    if (!isOpen) return null;
+
+    const selected =
+        DISASTERS.find((d) => d.id === selectedDisaster) ?? DISASTERS[0];
 
     return (
         <>
@@ -19,9 +97,9 @@ const DashboardSidebar = ({ isOpen, onClose }: DashboardSidebarProps) => {
                 onClick={onClose}
             />
             <aside
-                className="absolute left-0 top-0 z-30 h-full w-72
-                           border-r border-white/80 bg-white/90 shadow-xl
-                           backdrop-blur-md"
+                className="absolute left-0 top-0 z-30 flex h-full w-72
+                           flex-col border-r border-white/80 bg-white/90
+                           shadow-xl backdrop-blur-md"
             >
                 <div className="flex h-14 items-center justify-between border-b border-slate-900/10 px-4">
                     <p className="font-display text-sm font-bold text-slate-900">
@@ -35,24 +113,138 @@ const DashboardSidebar = ({ isOpen, onClose }: DashboardSidebarProps) => {
                         onClick={onClose}
                         aria-label="Close sidebar"
                     >
-                        ×
+                        &times;
                     </button>
                 </div>
-                <nav className="p-4">
-                    <ul className="space-y-1">
-                        <li>
+
+                <div className="flex-1 overflow-y-auto">
+                    {/* Disaster selector */}
+                    <div
+                        ref={dropdownRef}
+                        className="border-b border-slate-200 px-4 py-3"
+                    >
+                        <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Disaster
+                        </label>
+                        <div className="relative">
                             <button
                                 type="button"
-                                className="flex w-full items-center gap-3 rounded-lg
-                                           px-3 py-2 text-left text-sm font-medium text-slate-900
-                                           transition hover:bg-slate-100"
+                                className="flex w-full items-center justify-between rounded-lg
+                                           border border-slate-300 bg-white px-3 py-2
+                                           text-left text-sm font-medium text-slate-900
+                                           transition hover:border-slate-400"
+                                onClick={() => setIsDropdownOpen((o) => !o)}
+                                aria-expanded={isDropdownOpen}
+                                aria-haspopup="listbox"
+                                aria-controls="disaster-listbox"
                             >
-                                <MapPin className="h-4 w-4 text-slate-600" />
-                                Map
+                                <span className="truncate">
+                                    {selected.label}
+                                </span>
+                                <ChevronDown
+                                    className={`h-4 w-4 text-slate-500 transition ${
+                                        isDropdownOpen ? "rotate-180" : ""
+                                    }`}
+                                />
                             </button>
-                        </li>
-                    </ul>
-                </nav>
+                            {isDropdownOpen && (
+                                <ul
+                                    id="disaster-listbox"
+                                    role="listbox"
+                                    className="absolute left-0 right-0 top-full z-10 mt-1
+                                               rounded-lg border border-slate-200 bg-white
+                                               py-1 shadow-lg"
+                                >
+                                    {DISASTERS.map((d) => (
+                                        <li
+                                            key={d.id}
+                                            role="option"
+                                            aria-selected={
+                                                d.id === selectedDisaster
+                                            }
+                                        >
+                                            <button
+                                                type="button"
+                                                className={`w-full px-3 py-2 text-left text-sm transition hover:bg-slate-100 ${
+                                                    d.id === selectedDisaster
+                                                        ? "font-semibold text-blue-600"
+                                                        : "text-slate-700"
+                                                }`}
+                                                onClick={() => {
+                                                    setSelectedDisaster(d.id);
+                                                    setIsDropdownOpen(false);
+                                                }}
+                                            >
+                                                {d.label}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Navigation */}
+                    <nav className="border-b border-slate-200 px-4 py-3">
+                        <ul className="space-y-1">
+                            <li>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-3 rounded-lg
+                                               px-3 py-2 text-left text-sm font-medium text-slate-900
+                                               transition hover:bg-slate-100"
+                                    onClick={onClose}
+                                >
+                                    <MapPin className="h-4 w-4 text-slate-600" />
+                                    Map
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-3 rounded-lg
+                                               px-3 py-2 text-left text-sm font-medium text-slate-900
+                                               transition hover:bg-slate-100"
+                                    onClick={onDisasterInfoClick}
+                                >
+                                    <Info className="h-4 w-4 text-slate-600" />
+                                    Disaster Info
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+
+                    {/* Quick stats */}
+                    {polygons.length > 0 && (
+                        <div className="px-4 py-3">
+                            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Location Summary
+                            </h3>
+                            <p className="mb-2 text-sm font-semibold text-slate-800">
+                                {polygons.length} total locations
+                            </p>
+                            <ul className="space-y-1">
+                                {CLASSIFICATION_ORDER.map(
+                                    (key) =>
+                                        counts[key] > 0 && (
+                                            <li
+                                                key={key}
+                                                className="flex items-center gap-2 text-sm text-slate-700"
+                                            >
+                                                <span
+                                                    className={`h-2.5 w-2.5 rounded-full ${classificationDots[key]}`}
+                                                />
+                                                {classificationLabels[key]}:
+                                                <span className="font-semibold">
+                                                    {counts[key]}
+                                                </span>
+                                            </li>
+                                        ),
+                                )}
+                            </ul>
+                        </div>
+                    )}
+                </div>
             </aside>
         </>
     );

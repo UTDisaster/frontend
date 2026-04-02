@@ -208,6 +208,7 @@ const Dashboard = () => {
             <DashboardSidebar
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
+                polygons={polygons}
             />
             <ChatDock />
         </div>
