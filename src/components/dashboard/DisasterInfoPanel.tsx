@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 import {
@@ -11,6 +12,14 @@ interface DisasterInfoPanelProps {
     onClose: () => void;
     polygons: MapPolygon[];
 }
+
+const CLASSIFICATION_ORDER: ClassificationKey[] = [
+    "destroyed",
+    "severe",
+    "minor",
+    "none",
+    "unknown",
+];
 
 const classificationLabels: Record<ClassificationKey, string> = {
     destroyed: "Destroyed",
@@ -64,6 +73,20 @@ const DisasterInfoPanel = ({
     onClose,
     polygons,
 }: DisasterInfoPanelProps) => {
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        dialogRef.current?.focus();
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     const { counts, bounds } = computeStats(polygons);
@@ -71,20 +94,27 @@ const DisasterInfoPanel = ({
 
     return (
         <>
-            <button
-                type="button"
-                aria-label="Close disaster info"
+            <div
                 className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm"
+                aria-hidden="true"
                 onClick={onClose}
             />
             <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="disaster-info-title"
+                tabIndex={-1}
                 className="fixed left-1/2 top-1/2 z-50 w-[420px] max-w-[90vw]
                            -translate-x-1/2 -translate-y-1/2
                            rounded-2xl border border-white/80 bg-white/95
-                           shadow-2xl backdrop-blur-md"
+                           shadow-2xl backdrop-blur-md outline-none"
             >
                 <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                    <h2 className="text-base font-bold text-slate-900">
+                    <h2
+                        id="disaster-info-title"
+                        className="text-base font-bold text-slate-900"
+                    >
                         Disaster Information
                     </h2>
                     <button
@@ -142,9 +172,7 @@ const DisasterInfoPanel = ({
                             Damage Classification ({total} locations)
                         </h3>
                         <div className="space-y-2">
-                            {(
-                                Object.keys(counts) as ClassificationKey[]
-                            ).map((key) => {
+                            {CLASSIFICATION_ORDER.map((key) => {
                                 const count = counts[key];
                                 const pct =
                                     total > 0
