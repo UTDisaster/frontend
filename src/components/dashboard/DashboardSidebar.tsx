@@ -1,11 +1,12 @@
-import { MapPin } from 'lucide-react';
+import { Info, MapPin } from 'lucide-react';
 
 interface DashboardSidebarProps {
     isOpen: boolean;
     onClose: () => void;
+    onDisasterInfoClick?: () => void;
 }
 
-const DashboardSidebar = ({ isOpen, onClose }: DashboardSidebarProps) => {
+const DashboardSidebar = ({ isOpen, onClose, onDisasterInfoClick }: DashboardSidebarProps) => {
     if (!isOpen) {
         return null;
     }
@@ -49,6 +50,18 @@ const DashboardSidebar = ({ isOpen, onClose }: DashboardSidebarProps) => {
                             >
                                 <MapPin className="h-4 w-4 text-slate-600" />
                                 Map
+                            </button>
+                        </li>
+                        <li>
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-3 rounded-lg
+                                           px-3 py-2 text-left text-sm font-medium text-slate-900
+                                           transition hover:bg-slate-100"
+                                onClick={onDisasterInfoClick}
+                            >
+                                <Info className="h-4 w-4 text-slate-600" />
+                                Disaster Info
                             </button>
                         </li>
                     </ul>
