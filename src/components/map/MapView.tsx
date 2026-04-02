@@ -131,6 +131,83 @@ const isSameBbox = (a: ViewportBBox | null, b: ViewportBBox) =>
     a.maxLat === b.maxLat &&
     a.maxLng === b.maxLng;
 
+interface BoundsRect {
+    maxLat: number;
+    maxLng: number;
+    minLat: number;
+    minLng: number;
+}
+
+const toBoundsRect = (bounds: LatLngBoundsExpression): BoundsRect => {
+    const [[minLat, minLng], [maxLat, maxLng]] = bounds as [
+        [number, number],
+        [number, number],
+    ];
+    return { minLat, minLng, maxLat, maxLng };
+};
+
+const fromBoundsRect = (r: BoundsRect): LatLngBoundsExpression => [
+    [r.minLat, r.minLng],
+    [r.maxLat, r.maxLng],
+];
+
+const clipOverlappingOverlays = (
+    overlays: VisibleOverlay[],
+): VisibleOverlay[] => {
+    if (overlays.length <= 1) return overlays;
+
+    const rects = overlays.map((o) => toBoundsRect(o.bounds));
+
+    for (let i = 0; i < rects.length; i++) {
+        for (let j = i + 1; j < rects.length; j++) {
+            const a = rects[i];
+            const b = rects[j];
+
+            if (
+                a.minLat >= b.maxLat ||
+                a.maxLat <= b.minLat ||
+                a.minLng >= b.maxLng ||
+                a.maxLng <= b.minLng
+            ) {
+                continue;
+            }
+
+            const overlapLat =
+                Math.min(a.maxLat, b.maxLat) - Math.max(a.minLat, b.minLat);
+            const overlapLng =
+                Math.min(a.maxLng, b.maxLng) - Math.max(a.minLng, b.minLng);
+
+            if (overlapLat <= overlapLng) {
+                const midLat =
+                    (Math.max(a.minLat, b.minLat) +
+                        Math.min(a.maxLat, b.maxLat)) /
+                    2;
+                if (a.minLat < b.minLat) {
+                    a.maxLat = midLat;
+                    b.minLat = midLat;
+                } else {
+                    b.maxLat = midLat;
+                    a.minLat = midLat;
+                }
+            } else {
+                const midLng =
+                    (Math.max(a.minLng, b.minLng) +
+                        Math.min(a.maxLng, b.maxLng)) /
+                    2;
+                if (a.minLng < b.minLng) {
+                    a.maxLng = midLng;
+                    b.minLng = midLng;
+                } else {
+                    b.maxLng = midLng;
+                    a.minLng = midLng;
+                }
+            }
+        }
+    }
+
+    return overlays.map((o, i) => ({ ...o, bounds: fromBoundsRect(rects[i]) }));
+};
+
 const ViewportWatcher = ({ onViewportChange }: ViewportWatcherProps) => {
     const map = useMap();
 
@@ -292,7 +369,7 @@ const MapView = ({
             return [];
         }
 
-        return imagePairs
+        const filtered = imagePairs
             .map((pair) => ({
                 id: pair.image_pair_id,
                 bounds:
@@ -307,6 +384,8 @@ const MapView = ({
                     pair.url.length > 0 &&
                     pair.bounds !== null,
             );
+
+        return clipOverlappingOverlays(filtered);
     }, [imageOverlayMode, imagePairs]);
 
     return (
