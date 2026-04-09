@@ -214,6 +214,7 @@ const Dashboard = () => {
                     setIsSidebarOpen(false);
                     setIsDisasterInfoOpen(true);
                 }}
+                polygons={polygons}
             />
             <ChatDock />
             <DisasterInfoPanel
