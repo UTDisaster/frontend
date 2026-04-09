@@ -7,6 +7,7 @@ import ControlPanel, {
     type LocationToggleState,
 } from "@components/controls/ControlPanel";
 import DashboardSidebar from "@components/dashboard/DashboardSidebar";
+import DisasterInfoPanel from "@components/dashboard/DisasterInfoPanel";
 import ErrorBoundary from "@components/ErrorBoundary";
 import MapView, { type ViewportBBox } from "@components/map/MapView";
 import { normalizeClassification, type MapPolygon } from "@components/map/types";
@@ -118,6 +119,7 @@ function featuresToMapPolygons(features: unknown[]): MapPolygon[] {
 
 const Dashboard = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isDisasterInfoOpen, setIsDisasterInfoOpen] = useState(false);
     const [imageOverlayMode, setImageOverlayMode] =
         useState<ImageOverlayMode>("post");
     const [imageOverlayOpacity, setImageOverlayOpacity] = useState(0.8);
@@ -208,9 +210,18 @@ const Dashboard = () => {
             <DashboardSidebar
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
+                onDisasterInfoClick={() => {
+                    setIsSidebarOpen(false);
+                    setIsDisasterInfoOpen(true);
+                }}
                 polygons={polygons}
             />
             <ChatDock />
+            <DisasterInfoPanel
+                isOpen={isDisasterInfoOpen}
+                onClose={() => setIsDisasterInfoOpen(false)}
+                polygons={polygons}
+            />
         </div>
     );
 };
