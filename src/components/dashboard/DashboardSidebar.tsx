@@ -1,4 +1,4 @@
-import { ChevronDown, Info, MapPin } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Info, MapPin } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -7,11 +7,20 @@ import {
     type MapPolygon,
 } from "@components/map/types";
 
+interface DisasterLocation {
+    imagePairId: string;
+    centroid: { lat: number; lng: number };
+    count: number;
+}
+
 interface DashboardSidebarProps {
     isOpen: boolean;
     onClose: () => void;
     onDisasterInfoClick?: () => void;
     polygons?: MapPolygon[];
+    disasterLocations?: DisasterLocation[];
+    currentLocationIndex?: number;
+    onLocationNavigate?: (index: number) => void;
 }
 
 const DISASTERS = [
@@ -61,6 +70,9 @@ const DashboardSidebar = ({
     onClose,
     onDisasterInfoClick,
     polygons = [],
+    disasterLocations = [],
+    currentLocationIndex = 0,
+    onLocationNavigate,
 }: DashboardSidebarProps) => {
     const [selectedDisaster, setSelectedDisaster] = useState(DISASTERS[0].id);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -213,6 +225,62 @@ const DashboardSidebar = ({
                             </li>
                         </ul>
                     </nav>
+
+                    {/* Location navigation */}
+                    {disasterLocations.length > 0 && (
+                        <div className="border-b border-slate-200 px-4 py-3">
+                            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Locations ({disasterLocations.length} tiles)
+                            </h3>
+                            <div className="mb-2 flex items-center justify-between">
+                                <button
+                                    type="button"
+                                    className="grid h-7 w-7 place-items-center rounded-lg
+                                               text-slate-600 transition hover:bg-slate-100
+                                               disabled:opacity-40 disabled:pointer-events-none"
+                                    disabled={currentLocationIndex <= 0}
+                                    onClick={() => onLocationNavigate?.(currentLocationIndex - 1)}
+                                    aria-label="Previous location"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <span className="text-sm font-medium text-slate-700">
+                                    {currentLocationIndex + 1} / {disasterLocations.length}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="grid h-7 w-7 place-items-center rounded-lg
+                                               text-slate-600 transition hover:bg-slate-100
+                                               disabled:opacity-40 disabled:pointer-events-none"
+                                    disabled={currentLocationIndex >= disasterLocations.length - 1}
+                                    onClick={() => onLocationNavigate?.(currentLocationIndex + 1)}
+                                    aria-label="Next location"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <ul className="max-h-48 space-y-0.5 overflow-y-auto">
+                                {disasterLocations.map((loc, i) => (
+                                    <li key={loc.imagePairId}>
+                                        <button
+                                            type="button"
+                                            className={`w-full rounded-md px-3 py-1.5 text-left text-sm transition ${
+                                                i === currentLocationIndex
+                                                    ? "bg-blue-50 font-semibold text-blue-700"
+                                                    : "text-slate-700 hover:bg-slate-100"
+                                            }`}
+                                            onClick={() => onLocationNavigate?.(i)}
+                                        >
+                                            Tile {i + 1}
+                                            <span className="ml-1 text-xs text-slate-400">
+                                                ({loc.count} features)
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     {/* Quick stats */}
                     {polygons.length > 0 && (
