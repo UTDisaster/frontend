@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import ChatDock from "@components/chat/ChatDock";
+import ChatDock, { type ChatAction } from "@components/chat/ChatDock";
 import { getChatRuntimeConfig } from "@components/chat/config";
 import ControlPanel, {
     type ImageOverlayMode,
@@ -9,7 +9,7 @@ import ControlPanel, {
 import DashboardSidebar from "@components/dashboard/DashboardSidebar";
 import DisasterInfoPanel from "@components/dashboard/DisasterInfoPanel";
 import ErrorBoundary from "@components/ErrorBoundary";
-import MapView, { type ViewportBBox } from "@components/map/MapView";
+import MapView, { type FlyTarget, type ViewportBBox } from "@components/map/MapView";
 import { normalizeClassification, type MapPolygon } from "@components/map/types";
 
 const API_BASE_FALLBACK = "http://127.0.0.1:8000";
@@ -141,9 +141,37 @@ const Dashboard = () => {
     );
     const [polygons, setPolygons] = useState<MapPolygon[]>([]);
     const [viewport, setViewport] = useState<ViewportBBox | null>(null);
-    const [disasterLocations, setDisasterLocations] = useState<DisasterLocation[]>([]);
-    const [currentLocationIndex, setCurrentLocationIndex] = useState(0);
-    const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number } | null>(null);
+    const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
+
+    const VALID_OVERLAY_MODES: ReadonlySet<ImageOverlayMode> = new Set(["pre", "post", "none"]);
+
+    const handleChatAction = useCallback((action: ChatAction) => {
+        if (action.type === "flyTo" && action.lat != null && action.lng != null) {
+            setFlyTarget({ lat: action.lat, lng: action.lng, zoom: action.zoom });
+        } else if (action.type === "setOpacity" && typeof action.value === "number") {
+            const clamped = Math.max(0, Math.min(1, action.value));
+            setImageOverlayOpacity(clamped);
+        } else if (action.type === "setOverlayMode" && VALID_OVERLAY_MODES.has(action.mode as ImageOverlayMode)) {
+            setImageOverlayMode(action.mode as ImageOverlayMode);
+        } else if (action.type === "setFilters") {
+            const boolOrSkip = (v: unknown): boolean | null =>
+                typeof v === "boolean" ? v : null;
+            setLocationToggles((previous) => {
+                const next = { ...previous };
+                const d = boolOrSkip(action.destroyed);
+                const s = boolOrSkip(action.severe);
+                const m = boolOrSkip(action.minor);
+                const n = boolOrSkip(action.none);
+                const u = boolOrSkip(action.unknown);
+                if (d != null) next.destroyed = d;
+                if (s != null) next.severe = s;
+                if (m != null) next.minor = m;
+                if (n != null) next.none = n;
+                if (u != null) next.unknown = u;
+                return next;
+            });
+        }
+    }, []);
 
     useEffect(() => {
         if (!viewport) return;
@@ -279,7 +307,7 @@ const Dashboard = () => {
                 currentLocationIndex={currentLocationIndex}
                 onLocationNavigate={handleLocationNavigate}
             />
-            <ChatDock />
+            <ChatDock viewport={viewport} onAction={handleChatAction} />
             <DisasterInfoPanel
                 isOpen={isDisasterInfoOpen}
                 onClose={() => setIsDisasterInfoOpen(false)}

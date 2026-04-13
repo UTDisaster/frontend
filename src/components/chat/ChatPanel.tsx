@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEventHandler } from 'react';
 
+import type { ViewportBBox } from '@components/map/MapView';
+
+import type { ChatAction } from './ChatDock';
 import { createChatHistoryClient } from './clients/history/createChatHistoryClient';
 import { createMockChatHistoryClient } from './clients/history/mockChatHistoryClient';
 import type { ChatHistoryClient } from './clients/history/types';
@@ -29,6 +32,8 @@ import type {
 
 interface ChatPanelProps {
     setIsOpen: (isOpen: boolean) => void;
+    viewport: ViewportBBox | null;
+    onAction?: (action: ChatAction) => void;
 }
 
 const runtimeConfig = getChatRuntimeConfig();
@@ -122,7 +127,7 @@ const hydrateConversations = async (
     );
 };
 
-const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
+const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
     const [conversations, setConversations] =
         useState<ChatConversation[]>(initialConversations);
     const [activeConversationId, setActiveConversationId] =
@@ -131,9 +136,13 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [connectionState, setConnectionState] =
         useState<ChatConnectionState>('connecting');
+    const [isThinking, setIsThinking] = useState(false);
 
     const listRef = useRef<HTMLDivElement | null>(null);
     const realtimeClientRef = useRef<ChatRealtimeClient | null>(null);
+    const backendConversationIdRef = useRef<number | null>(null);
+    const suppressMockRef = useRef(false);
+    const inflightCountRef = useRef(0);
 
     const sortedConversations = useMemo(
         () => sortConversationsByUpdatedAt(conversations),
@@ -168,7 +177,7 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
         }
 
         listRef.current.scrollTop = listRef.current.scrollHeight;
-    }, [activeConversation?.messages]);
+    }, [activeConversation?.messages, isThinking]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -244,6 +253,11 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
                 return;
             }
 
+            // Skip mock response when backend already replied
+            if (suppressMockRef.current) {
+                return;
+            }
+
             const inboundMessage = mapMessageRecordToUiMessage(event.message);
             setConversations((current) =>
                 appendMessageToConversation(
@@ -296,8 +310,11 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
             sentAt: new Date().toISOString(),
         };
 
+        let targetConversationId = effectiveActiveId;
+
         if (effectiveActiveId === NEW_CHAT_ID) {
             const newConversation = createNewConversation(userMessage);
+            targetConversationId = newConversation.id;
             setConversations((current) =>
                 sortConversationsByUpdatedAt([newConversation, ...current]),
             );
@@ -327,6 +344,64 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
         }
 
         setDraft('');
+
+        const { apiBaseUrl } = getChatRuntimeConfig();
+        if (apiBaseUrl) {
+            // Suppress mock while any backend request is in-flight
+            inflightCountRef.current += 1;
+            suppressMockRef.current = true;
+            setIsThinking(true);
+
+            const body: Record<string, unknown> = {
+                message: trimmed,
+                conversation_id: backendConversationIdRef.current,
+            };
+            if (viewport) {
+                body.viewport = viewport;
+            }
+            fetch(`${apiBaseUrl}/chat/message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+                .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+                .then((data: { conversation_id: number; reply: string; actions?: ChatAction[] }) => {
+                    backendConversationIdRef.current = data.conversation_id;
+                    const agentMessage: ChatMessage = {
+                        id: createMessageId('agent'),
+                        sender: 'agent',
+                        text: data.reply,
+                        sentAt: new Date().toISOString(),
+                    };
+                    setConversations((current) =>
+                        appendMessageToConversation(
+                            current,
+                            targetConversationId,
+                            agentMessage,
+                        ),
+                    );
+                    if (data.actions && Array.isArray(data.actions)) {
+                        for (const action of data.actions) {
+                            onAction?.(action);
+                        }
+                    }
+                })
+                .catch(() => {
+                    // Backend unavailable — allow mock client to respond as fallback
+                })
+                .finally(() => {
+                    inflightCountRef.current -= 1;
+                    if (inflightCountRef.current <= 0) {
+                        inflightCountRef.current = 0;
+                        setIsThinking(false);
+                        suppressMockRef.current = false;
+                    }
+                });
+        } else {
+            // No backend configured — allow mock to respond as fallback
+            suppressMockRef.current = false;
+            setIsThinking(false);
+        }
     };
 
     const handleSelectConversation = (conversationId: string) => {
@@ -361,6 +436,7 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
             <ChatMessageList
                 messages={activeConversation?.messages ?? []}
                 listRef={listRef}
+                isThinking={isThinking}
             />
             <ChatInput
                 draft={draft}

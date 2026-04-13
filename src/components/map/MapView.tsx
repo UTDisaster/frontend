@@ -315,13 +315,42 @@ const PolygonWithStyle = ({ polygon }: { polygon: MapPolygon }) => {
     );
 };
 
+export interface FlyTarget {
+    lat: number;
+    lng: number;
+    zoom?: number;
+}
+
+const FlyToHandler = ({ target }: { target: FlyTarget | null }) => {
+    const map = useMap();
+    const lastTargetRef = useRef<FlyTarget | null>(null);
+
+    useEffect(() => {
+        if (
+            !target ||
+            (lastTargetRef.current &&
+                lastTargetRef.current.lat === target.lat &&
+                lastTargetRef.current.lng === target.lng &&
+                lastTargetRef.current.zoom === target.zoom)
+        ) {
+            return;
+        }
+        lastTargetRef.current = target;
+        map.flyTo([target.lat, target.lng], target.zoom ?? 17, {
+            duration: 1.5,
+        });
+    }, [target, map]);
+
+    return null;
+};
+
 interface MapViewProps {
     imageOverlayOpacity?: number;
     imageOverlayMode?: ImageOverlayMode;
     polygons?: MapPolygon[];
     onViewportChange?: (bbox: ViewportBBox) => void;
     disablePolygons?: boolean;
-    flyTarget?: { lat: number; lng: number } | null;
+    flyTarget?: FlyTarget | null;
 }
 
 const MapView = ({
