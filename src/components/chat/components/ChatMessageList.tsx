@@ -1,17 +1,17 @@
-import type { RefObject } from 'react';
+import React from 'react';
 
 import type { ChatMessage } from '../types';
 import ChatBubble from './ChatBubble';
 
 interface ChatMessageListProps {
     messages: ChatMessage[];
-    listRef: RefObject<HTMLDivElement | null>;
+    listRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const ChatMessageList = ({ messages, listRef }: ChatMessageListProps) => {
     return (
         <div
-            ref={listRef}
+            ref={listRef as React.LegacyRef<HTMLDivElement>}
             className="flex h-[360px] flex-col gap-3 overflow-y-auto px-4 py-4"
         >
             {messages.map((message) => (

@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef } from 'react';
-import type { SubmitEventHandler } from 'react';
+import type { FormEventHandler } from 'react';
 import { Send } from 'lucide-react';
 
 interface ChatInputProps {
     draft: string;
     onDraftChange: (value: string) => void;
-    onSend: SubmitEventHandler<HTMLFormElement>;
+    onSend: FormEventHandler<HTMLFormElement>;
 }
 
 const ChatInput = ({ draft, onDraftChange, onSend }: ChatInputProps) => {

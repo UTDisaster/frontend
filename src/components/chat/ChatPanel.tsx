@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { SubmitEventHandler } from 'react';
+import type { FormEventHandler } from 'react';
 
 import { createChatHistoryClient } from './clients/history/createChatHistoryClient';
 import { createMockChatHistoryClient } from './clients/history/mockChatHistoryClient';
@@ -281,7 +281,7 @@ const ChatPanel = ({ setIsOpen }: ChatPanelProps) => {
         };
     }, []);
 
-    const handleSend: SubmitEventHandler<HTMLFormElement> = (event) => {
+    const handleSend: FormEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
 
         const trimmed = draft.trim();
