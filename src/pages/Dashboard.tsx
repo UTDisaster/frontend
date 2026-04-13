@@ -30,6 +30,12 @@ type GeoJsonFeature = {
 
 type PolygonRing = [number, number][];
 
+interface DisasterLocation {
+    imagePairId: string;
+    centroid: { lat: number; lng: number };
+    count: number;
+}
+
 const toLatLng = ([lng, lat]: [number, number]) => [lat, lng] as [number, number];
 
 const pushPolygon = (
@@ -195,6 +201,56 @@ const Dashboard = () => {
         return () => controller.abort();
     }, [viewport]);
 
+    useEffect(() => {
+        const { apiBaseUrl } = getChatRuntimeConfig();
+        const base = apiBaseUrl || API_BASE_FALLBACK;
+        const params = new URLSearchParams({
+            min_lng: "-80.0",
+            min_lat: "33.0",
+            max_lng: "-77.0",
+            max_lat: "35.5",
+            limit: "10000",
+        });
+        const url = `${base.replace(/\/+$/, "")}/locations?${params.toString()}`;
+        const controller = new AbortController();
+
+        fetch(url, { signal: controller.signal })
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+            .then((data: { features?: ApiLocationFeature[] }) => {
+                const byPair = new Map<string, { lats: number[]; lngs: number[]; count: number }>();
+                for (const f of data.features ?? []) {
+                    const pairId = f.image_pair_id;
+                    const lat = f.centroid?.lat;
+                    const lng = f.centroid?.lng;
+                    if (!pairId || typeof lat !== "number" || typeof lng !== "number") continue;
+                    const entry = byPair.get(pairId) ?? { lats: [], lngs: [], count: 0 };
+                    entry.lats.push(lat);
+                    entry.lngs.push(lng);
+                    entry.count += 1;
+                    byPair.set(pairId, entry);
+                }
+                const locations: DisasterLocation[] = [];
+                for (const [imagePairId, entry] of byPair) {
+                    const avgLat = entry.lats.reduce((a, b) => a + b, 0) / entry.lats.length;
+                    const avgLng = entry.lngs.reduce((a, b) => a + b, 0) / entry.lngs.length;
+                    locations.push({ imagePairId, centroid: { lat: avgLat, lng: avgLng }, count: entry.count });
+                }
+                setDisasterLocations(locations);
+            })
+            .catch((error) => {
+                if (controller.signal.aborted) return;
+                console.error("Failed to fetch disaster locations:", error);
+            });
+
+        return () => controller.abort();
+    }, []);
+
+    const handleLocationNavigate = useCallback((index: number) => {
+        if (index < 0 || index >= disasterLocations.length) return;
+        setCurrentLocationIndex(index);
+        setFlyTarget({ ...disasterLocations[index].centroid });
+    }, [disasterLocations]);
+
     const visiblePolygons = polygons.filter((polygon) => {
         const key = normalizeClassification(polygon.classification ?? null);
         return locationToggles[key];
@@ -247,6 +303,9 @@ const Dashboard = () => {
                     setIsDisasterInfoOpen(true);
                 }}
                 polygons={polygons}
+                disasterLocations={disasterLocations}
+                currentLocationIndex={currentLocationIndex}
+                onLocationNavigate={handleLocationNavigate}
             />
             <ChatDock viewport={viewport} onAction={handleChatAction} />
             <DisasterInfoPanel

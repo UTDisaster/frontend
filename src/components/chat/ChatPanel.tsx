@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { SubmitEventHandler } from 'react';
+import type { FormEventHandler } from 'react';
 
 import type { ViewportBBox } from '@components/map/MapView';
 
@@ -295,7 +295,7 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
         };
     }, []);
 
-    const handleSend: SubmitEventHandler<HTMLFormElement> = (event) => {
+    const handleSend: FormEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
 
         const trimmed = draft.trim();

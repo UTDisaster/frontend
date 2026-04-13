@@ -242,6 +242,25 @@ const ViewportWatcher = ({ onViewportChange }: ViewportWatcherProps) => {
     return null;
 };
 
+const FlyToHandler = ({ target }: { target: { lat: number; lng: number } | null }) => {
+    const map = useMap();
+    const prevTarget = useRef<{ lat: number; lng: number } | null>(null);
+
+    useEffect(() => {
+        if (
+            !target ||
+            (prevTarget.current &&
+                prevTarget.current.lat === target.lat &&
+                prevTarget.current.lng === target.lng)
+        )
+            return;
+        prevTarget.current = target;
+        map.flyTo([target.lat, target.lng], 17, { duration: 1.5 });
+    }, [map, target]);
+
+    return null;
+};
+
 const PolygonLayer = ({ polygons }: { polygons: MapPolygon[] }) => {
     if (polygons.length === 0) return null;
 
