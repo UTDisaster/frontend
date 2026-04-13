@@ -138,7 +138,7 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
         useState<ChatConnectionState>('connecting');
     const [isThinking, setIsThinking] = useState(false);
 
-    const listRef = useRef<HTMLDivElement | null>(null);
+    const listRef = useRef<HTMLDivElement>(null!);
     const realtimeClientRef = useRef<ChatRealtimeClient | null>(null);
     const backendConversationIdRef = useRef<number | null>(null);
     const suppressMockRef = useRef(false);

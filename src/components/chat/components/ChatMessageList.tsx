@@ -1,11 +1,11 @@
-import React from 'react';
+import type { RefObject } from 'react';
 
 import type { ChatMessage } from '../types';
 import ChatBubble from './ChatBubble';
 
 interface ChatMessageListProps {
     messages: ChatMessage[];
-    listRef: RefObject<HTMLDivElement | null>;
+    listRef: RefObject<HTMLDivElement>;
     isThinking?: boolean;
 }
 
@@ -20,7 +20,7 @@ const ThinkingBubble = () => (
 const ChatMessageList = ({ messages, listRef, isThinking = false }: ChatMessageListProps) => {
     return (
         <div
-            ref={listRef as React.LegacyRef<HTMLDivElement>}
+            ref={listRef}
             className="flex h-[360px] flex-col gap-3 overflow-y-auto px-4 py-4"
         >
             {messages.map((message) => (

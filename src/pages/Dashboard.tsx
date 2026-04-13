@@ -140,6 +140,10 @@ const Dashboard = () => {
         },
     );
     const [polygons, setPolygons] = useState<MapPolygon[]>([]);
+    const [disasterLocations, setDisasterLocations] = useState<
+        DisasterLocation[]
+    >([]);
+    const [currentLocationIndex, setCurrentLocationIndex] = useState(0);
     const [viewport, setViewport] = useState<ViewportBBox | null>(null);
     const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
 
