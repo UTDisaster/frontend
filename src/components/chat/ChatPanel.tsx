@@ -1,34 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEventHandler } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEventHandler } from "react";
 
-import type { ViewportBBox } from '@components/map/MapView';
+import type { ViewportBBox } from "@components/map/MapView";
 
-import type { ChatAction } from './ChatDock';
-import { createChatHistoryClient } from './clients/history/createChatHistoryClient';
-import { createMockChatHistoryClient } from './clients/history/mockChatHistoryClient';
-import type { ChatHistoryClient } from './clients/history/types';
-import { createMockChatRealtimeClient } from './clients/realtime/mockChatRealtimeClient';
-import type { ChatRealtimeClient } from './clients/realtime/types';
-import ChatInput from './components/ChatInput';
-import ChatHeader from './components/ChatHeader';
-import ChatMessageList from './components/ChatMessageList';
-import { getChatRuntimeConfig } from './config';
+import type { ChatAction } from "./ChatDock";
+import { createChatHistoryClient } from "./clients/history/createChatHistoryClient";
+import { createMockChatHistoryClient } from "./clients/history/mockChatHistoryClient";
+import type { ChatHistoryClient } from "./clients/history/types";
+import { createMockChatRealtimeClient } from "./clients/realtime/mockChatRealtimeClient";
+import type { ChatRealtimeClient } from "./clients/realtime/types";
+import ChatInput from "./components/ChatInput";
+import ChatHeader from "./components/ChatHeader";
+import ChatMessageList from "./components/ChatMessageList";
+import { getChatRuntimeConfig } from "./config";
 import type {
     ChatInboundEventEnvelope,
     ChatOutboundEventEnvelope,
-} from './contracts';
+} from "./contracts";
 import {
     mapConversationDetailToUiConversation,
     mapMessageRecordToUiMessage,
     mapUiMessageToMessageRecord,
-} from './mappers';
-import mockConversations from './mockConversations';
+} from "./mappers";
+import mockConversations from "./mockConversations";
 import type {
     ChatConnectionState,
     ChatConversation,
     ChatMessage,
     Sender,
-} from './types';
+} from "./types";
 
 interface ChatPanelProps {
     setIsOpen: (isOpen: boolean) => void;
@@ -62,10 +62,10 @@ const initialConversations = sortConversationsByUpdatedAt(
 );
 
 const buildConnectionLabel = (state: ChatConnectionState): string => {
-    if (state === 'connecting') return 'Connecting...';
-    if (state === 'connected') return 'Mock';
-    if (state === 'error') return 'Connection error';
-    return 'Disconnected';
+    if (state === "connecting") return "Connecting...";
+    if (state === "connected") return "Mock";
+    if (state === "error") return "Connection error";
+    return "Disconnected";
 };
 
 let messageCounter = 0;
@@ -74,7 +74,7 @@ const createMessageId = (sender: Sender): string => {
     return `${sender}-${Date.now()}-${messageCounter}`;
 };
 
-const NEW_CHAT_ID = '';
+const NEW_CHAT_ID = "";
 
 const appendMessageToConversation = (
     conversations: ChatConversation[],
@@ -93,9 +93,7 @@ const appendMessageToConversation = (
         };
     });
 
-const createNewConversation = (
-    firstMessage: ChatMessage,
-): ChatConversation => {
+const createNewConversation = (firstMessage: ChatMessage): ChatConversation => {
     const id = `conv-new-${Date.now()}`;
     const title =
         firstMessage.text.length > 40
@@ -132,10 +130,10 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
         useState<ChatConversation[]>(initialConversations);
     const [activeConversationId, setActiveConversationId] =
         useState<string>(NEW_CHAT_ID);
-    const [draft, setDraft] = useState('');
+    const [draft, setDraft] = useState("");
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [connectionState, setConnectionState] =
-        useState<ChatConnectionState>('connecting');
+        useState<ChatConnectionState>("connecting");
     const [isThinking, setIsThinking] = useState(false);
 
     const listRef = useRef<HTMLDivElement>(null!);
@@ -241,15 +239,15 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
 
         const client: ChatRealtimeClient = createMockChatRealtimeClient();
         realtimeClientRef.current = client;
-        setConnectionState('connecting');
+        setConnectionState("connecting");
 
         const handleInboundEvent = (event: ChatInboundEventEnvelope) => {
-            if (event.type === 'chat.error') {
-                setConnectionState('error');
+            if (event.type === "chat.error") {
+                setConnectionState("error");
                 return;
             }
 
-            if (event.type !== 'chat.agent_message') {
+            if (event.type !== "chat.agent_message") {
                 return;
             }
 
@@ -274,13 +272,13 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
             try {
                 await client.connect();
                 if (!isCancelled) {
-                    setConnectionState('connected');
+                    setConnectionState("connected");
                 }
             } catch {
                 unsubscribe();
                 client.disconnect();
                 if (!isCancelled) {
-                    setConnectionState('error');
+                    setConnectionState("error");
                 }
             }
         };
@@ -304,8 +302,8 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
         }
 
         const userMessage: ChatMessage = {
-            id: createMessageId('user'),
-            sender: 'user',
+            id: createMessageId("user"),
+            sender: "user",
             text: trimmed,
             sentAt: new Date().toISOString(),
         };
@@ -321,7 +319,7 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
             setActiveConversationId(newConversation.id);
 
             const outboundEvent: ChatOutboundEventEnvelope = {
-                type: 'chat.user_message',
+                type: "chat.user_message",
                 conversation_id: newConversation.id,
                 message: mapUiMessageToMessageRecord(userMessage),
             };
@@ -336,14 +334,14 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
             );
 
             const outboundEvent: ChatOutboundEventEnvelope = {
-                type: 'chat.user_message',
+                type: "chat.user_message",
                 conversation_id: activeConversation.id,
                 message: mapUiMessageToMessageRecord(userMessage),
             };
             realtimeClientRef.current?.send(outboundEvent);
         }
 
-        setDraft('');
+        setDraft("");
 
         const { apiBaseUrl } = getChatRuntimeConfig();
         if (apiBaseUrl) {
@@ -360,34 +358,78 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
                 body.viewport = viewport;
             }
             fetch(`${apiBaseUrl}/chat/message`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             })
-                .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-                .then((data: { conversation_id: number; reply: string; actions?: ChatAction[] }) => {
-                    backendConversationIdRef.current = data.conversation_id;
-                    const agentMessage: ChatMessage = {
-                        id: createMessageId('agent'),
-                        sender: 'agent',
-                        text: data.reply,
+                .then((r) => {
+                    if (r.ok) {
+                        return r.json();
+                    }
+                    const retryAfter =
+                        r.status === 503 ? r.headers.get("Retry-After") : null;
+                    const error = new Error(`${r.status}`);
+                    (
+                        error as Error & { retryAfter: string | null }
+                    ).retryAfter = retryAfter;
+                    return Promise.reject(error);
+                })
+                .then(
+                    (data: {
+                        conversation_id: number;
+                        reply: string;
+                        actions?: ChatAction[];
+                    }) => {
+                        backendConversationIdRef.current = data.conversation_id;
+                        const agentMessage: ChatMessage = {
+                            id: createMessageId("agent"),
+                            sender: "agent",
+                            text: data.reply,
+                            sentAt: new Date().toISOString(),
+                        };
+                        setConversations((current) =>
+                            appendMessageToConversation(
+                                current,
+                                targetConversationId,
+                                agentMessage,
+                            ),
+                        );
+                        if (data.actions && Array.isArray(data.actions)) {
+                            for (const action of data.actions) {
+                                onAction?.(action);
+                            }
+                        }
+                    },
+                )
+                .catch((err: unknown) => {
+                    let errorText =
+                        "Unable to reach the chat service. Please try again later.";
+                    if (err instanceof Error && "retryAfter" in err) {
+                        const raw = (
+                            err as Error & { retryAfter: string | null }
+                        ).retryAfter;
+                        const parsed = parseInt(raw ?? "", 10);
+                        if (
+                            !Number.isNaN(parsed) &&
+                            parsed > 0 &&
+                            parsed < 3600
+                        ) {
+                            errorText += ` (retry after ${parsed}s)`;
+                        }
+                    }
+                    const errorMessage: ChatMessage = {
+                        id: createMessageId("agent"),
+                        sender: "agent",
+                        text: errorText,
                         sentAt: new Date().toISOString(),
                     };
                     setConversations((current) =>
                         appendMessageToConversation(
                             current,
                             targetConversationId,
-                            agentMessage,
+                            errorMessage,
                         ),
                     );
-                    if (data.actions && Array.isArray(data.actions)) {
-                        for (const action of data.actions) {
-                            onAction?.(action);
-                        }
-                    }
-                })
-                .catch(() => {
-                    // Backend unavailable — allow mock client to respond as fallback
                 })
                 .finally(() => {
                     inflightCountRef.current -= 1;
@@ -409,6 +451,16 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
         setIsHistoryOpen(false);
     };
 
+    const handleNewConversation = () => {
+        // Clear any state from an in-flight request so the new thread
+        // doesn't inherit a stuck thinking indicator or suppressed mock.
+        inflightCountRef.current = 0;
+        suppressMockRef.current = false;
+        setIsThinking(false);
+        setActiveConversationId(NEW_CHAT_ID);
+        setIsHistoryOpen(false);
+    };
+
     return (
         <section
             className="w-[720px]
@@ -419,9 +471,7 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
         >
             <ChatHeader
                 onClose={() => setIsOpen(false)}
-                conversationTitle={
-                    activeConversation?.title ?? 'New chat'
-                }
+                conversationTitle={activeConversation?.title ?? "New chat"}
                 connectionLabel={connectionLabel}
                 isHistoryOpen={isHistoryOpen}
                 conversations={sortedConversations}
@@ -432,6 +482,7 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
                 }
                 onCloseHistory={() => setIsHistoryOpen(false)}
                 onSelectConversation={handleSelectConversation}
+                onNewChat={handleNewConversation}
             />
             <ChatMessageList
                 messages={activeConversation?.messages ?? []}

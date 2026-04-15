@@ -1,4 +1,4 @@
-import { History, X } from 'lucide-react';
+import { History, SquarePen, X } from 'lucide-react';
 
 import type { ChatConversation } from '../types';
 import ChatHistoryMenu from './ChatHistoryMenu';
@@ -14,6 +14,7 @@ interface ChatHeaderProps {
     onToggleHistory: () => void;
     onCloseHistory: () => void;
     onSelectConversation: (conversationId: string) => void;
+    onNewChat: () => void;
 }
 
 const ChatHeader = ({
@@ -27,6 +28,7 @@ const ChatHeader = ({
     onToggleHistory,
     onCloseHistory,
     onSelectConversation,
+    onNewChat,
 }: ChatHeaderProps) => {
     return (
         <header className="relative flex items-center justify-between border-b border-slate-900/10 px-5 py-4">
@@ -37,6 +39,14 @@ const ChatHeader = ({
                 </p>
             </div>
             <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900/10 text-slate-900 transition hover:bg-slate-900/20"
+                    onClick={onNewChat}
+                    aria-label="New chat"
+                >
+                    <SquarePen className="h-4 w-4" />
+                </button>
                 <button
                     type="button"
                     className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900/10 text-slate-900 transition hover:bg-slate-900/20"
