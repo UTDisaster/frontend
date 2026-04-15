@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import ChatDock, { type ChatAction } from "@components/chat/ChatDock";
 import { getChatRuntimeConfig } from "@components/chat/config";
+import { useBoundsCache } from "../hooks/useBoundsCache";
+import { useDebouncedCallback } from "../hooks/useDebouncedCallback";
 import ControlPanel, {
     type ImageOverlayMode,
     type LocationToggleState,
@@ -9,8 +11,14 @@ import ControlPanel, {
 import DashboardSidebar from "@components/dashboard/DashboardSidebar";
 import DisasterInfoPanel from "@components/dashboard/DisasterInfoPanel";
 import ErrorBoundary from "@components/ErrorBoundary";
-import MapView, { type FlyTarget, type ViewportBBox } from "@components/map/MapView";
-import { normalizeClassification, type MapPolygon } from "@components/map/types";
+import MapView, {
+    type FlyTarget,
+    type ViewportBBox,
+} from "@components/map/MapView";
+import {
+    normalizeClassification,
+    type MapPolygon,
+} from "@components/map/types";
 
 const API_BASE_FALLBACK = "http://127.0.0.1:8000";
 
@@ -36,7 +44,8 @@ interface DisasterLocation {
     count: number;
 }
 
-const toLatLng = ([lng, lat]: [number, number]) => [lat, lng] as [number, number];
+const toLatLng = ([lng, lat]: [number, number]) =>
+    [lat, lng] as [number, number];
 
 const pushPolygon = (
     out: MapPolygon[],
@@ -79,11 +88,18 @@ function featuresToMapPolygons(features: unknown[]): MapPolygon[] {
             ("classification" in f && f.classification) ||
             (props.damage_level as string | undefined) ||
             undefined;
-        const area = (props.area as string | undefined) ||
-            ("feature_type" in f && f.feature_type ? String(f.feature_type) : undefined);
+        const area =
+            (props.area as string | undefined) ||
+            ("feature_type" in f && f.feature_type
+                ? String(f.feature_type)
+                : undefined);
         const notes = (props.notes as string | undefined) || undefined;
 
-        if (geometry.type === "Point" && Array.isArray(coords) && coords.length >= 2) {
+        if (
+            geometry.type === "Point" &&
+            Array.isArray(coords) &&
+            coords.length >= 2
+        ) {
             const [lng, lat] = coords as number[];
             const d = 0.0001;
             out.push({
@@ -140,6 +156,16 @@ const Dashboard = () => {
         },
     );
     const [polygons, setPolygons] = useState<MapPolygon[]>([]);
+    const polygonMapRef = useRef<Map<string, MapPolygon>>(new Map());
+    const {
+        check: checkBounds,
+        commit: commitBounds,
+        reset: resetBoundsCache,
+    } = useBoundsCache();
+    const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+    // Cap session-accumulated polygons to bound memory and render cost.
+    const MAX_POLYGONS = 20000;
+    const TRIM_TO_POLYGONS = 15000;
     const [disasterLocations, setDisasterLocations] = useState<
         DisasterLocation[]
     >([]);
@@ -147,15 +173,33 @@ const Dashboard = () => {
     const [viewport, setViewport] = useState<ViewportBBox | null>(null);
     const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
 
-    const VALID_OVERLAY_MODES: ReadonlySet<ImageOverlayMode> = new Set(["pre", "post", "none"]);
+    const VALID_OVERLAY_MODES: ReadonlySet<ImageOverlayMode> = new Set([
+        "pre",
+        "post",
+        "none",
+    ]);
 
     const handleChatAction = useCallback((action: ChatAction) => {
-        if (action.type === "flyTo" && action.lat != null && action.lng != null) {
-            setFlyTarget({ lat: action.lat, lng: action.lng, zoom: action.zoom });
-        } else if (action.type === "setOpacity" && typeof action.value === "number") {
+        if (
+            action.type === "flyTo" &&
+            action.lat != null &&
+            action.lng != null
+        ) {
+            setFlyTarget({
+                lat: action.lat,
+                lng: action.lng,
+                zoom: action.zoom,
+            });
+        } else if (
+            action.type === "setOpacity" &&
+            typeof action.value === "number"
+        ) {
             const clamped = Math.max(0, Math.min(1, action.value));
             setImageOverlayOpacity(clamped);
-        } else if (action.type === "setOverlayMode" && VALID_OVERLAY_MODES.has(action.mode as ImageOverlayMode)) {
+        } else if (
+            action.type === "setOverlayMode" &&
+            VALID_OVERLAY_MODES.has(action.mode as ImageOverlayMode)
+        ) {
             setImageOverlayMode(action.mode as ImageOverlayMode);
         } else if (action.type === "setFilters") {
             const boolOrSkip = (v: unknown): boolean | null =>
@@ -179,31 +223,59 @@ const Dashboard = () => {
 
     useEffect(() => {
         if (!viewport) return;
+
+        // Skip fetch if viewport is within the already-fetched region
+        const { shouldFetch, fetchBounds } = checkBounds(viewport);
+        if (!shouldFetch || !fetchBounds) return;
+
         const { apiBaseUrl } = getChatRuntimeConfig();
         const base = apiBaseUrl || API_BASE_FALLBACK;
         const params = new URLSearchParams({
-            min_lng: String(viewport.minLng),
-            min_lat: String(viewport.minLat),
-            max_lng: String(viewport.maxLng),
-            max_lat: String(viewport.maxLat),
+            min_lng: String(fetchBounds.minLng),
+            min_lat: String(fetchBounds.minLat),
+            max_lng: String(fetchBounds.maxLng),
+            max_lat: String(fetchBounds.maxLat),
             limit: "5000",
         });
         const url = `${base.replace(/\/+$/, "")}/locations?${params.toString()}`;
         const controller = new AbortController();
 
+        setIsLoadingLocations(true);
         fetch(url, { signal: controller.signal })
-            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+            .then((r) =>
+                r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
+            )
             .then((data: { features?: unknown[] }) => {
-                setPolygons(featuresToMapPolygons(data.features ?? []));
+                // Advance the bounds cache only on successful delivery.
+                commitBounds(fetchBounds);
+                // Merge into cache map keyed by id to deduplicate across fetches.
+                const newPolygons = featuresToMapPolygons(data.features ?? []);
+                for (const p of newPolygons) {
+                    polygonMapRef.current.set(p.id, p);
+                }
+                // Trim oldest entries when over the cap (Map preserves insertion order).
+                if (polygonMapRef.current.size > MAX_POLYGONS) {
+                    const entries = Array.from(polygonMapRef.current.entries());
+                    polygonMapRef.current = new Map(
+                        entries.slice(-TRIM_TO_POLYGONS),
+                    );
+                }
+                setPolygons(Array.from(polygonMapRef.current.values()));
             })
             .catch((error) => {
                 if (controller.signal.aborted) return;
                 console.error("Failed to fetch locations:", error);
-                setPolygons([]);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setIsLoadingLocations(false);
             });
 
         return () => controller.abort();
-    }, [viewport]);
+    }, [viewport, checkBounds, commitBounds]);
+
+    // Expose a manual invalidation for future filter-reset UX; keeps the
+    // reset path in scope so the session cache can be cleared deliberately.
+    void resetBoundsCache;
 
     useEffect(() => {
         const { apiBaseUrl } = getChatRuntimeConfig();
@@ -219,15 +291,29 @@ const Dashboard = () => {
         const controller = new AbortController();
 
         fetch(url, { signal: controller.signal })
-            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+            .then((r) =>
+                r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
+            )
             .then((data: { features?: ApiLocationFeature[] }) => {
-                const byPair = new Map<string, { lats: number[]; lngs: number[]; count: number }>();
+                const byPair = new Map<
+                    string,
+                    { lats: number[]; lngs: number[]; count: number }
+                >();
                 for (const f of data.features ?? []) {
                     const pairId = f.image_pair_id;
                     const lat = f.centroid?.lat;
                     const lng = f.centroid?.lng;
-                    if (!pairId || typeof lat !== "number" || typeof lng !== "number") continue;
-                    const entry = byPair.get(pairId) ?? { lats: [], lngs: [], count: 0 };
+                    if (
+                        !pairId ||
+                        typeof lat !== "number" ||
+                        typeof lng !== "number"
+                    )
+                        continue;
+                    const entry = byPair.get(pairId) ?? {
+                        lats: [],
+                        lngs: [],
+                        count: 0,
+                    };
                     entry.lats.push(lat);
                     entry.lngs.push(lng);
                     entry.count += 1;
@@ -235,9 +321,17 @@ const Dashboard = () => {
                 }
                 const locations: DisasterLocation[] = [];
                 for (const [imagePairId, entry] of byPair) {
-                    const avgLat = entry.lats.reduce((a, b) => a + b, 0) / entry.lats.length;
-                    const avgLng = entry.lngs.reduce((a, b) => a + b, 0) / entry.lngs.length;
-                    locations.push({ imagePairId, centroid: { lat: avgLat, lng: avgLng }, count: entry.count });
+                    const avgLat =
+                        entry.lats.reduce((a, b) => a + b, 0) /
+                        entry.lats.length;
+                    const avgLng =
+                        entry.lngs.reduce((a, b) => a + b, 0) /
+                        entry.lngs.length;
+                    locations.push({
+                        imagePairId,
+                        centroid: { lat: avgLat, lng: avgLng },
+                        count: entry.count,
+                    });
                 }
                 setDisasterLocations(locations);
             })
@@ -249,11 +343,16 @@ const Dashboard = () => {
         return () => controller.abort();
     }, []);
 
-    const handleLocationNavigate = useCallback((index: number) => {
-        if (index < 0 || index >= disasterLocations.length) return;
-        setCurrentLocationIndex(index);
-        setFlyTarget({ ...disasterLocations[index].centroid });
-    }, [disasterLocations]);
+    const handleLocationNavigate = useCallback(
+        (index: number) => {
+            if (index < 0 || index >= disasterLocations.length) return;
+            setCurrentLocationIndex(index);
+            setFlyTarget({ ...disasterLocations[index].centroid });
+        },
+        [disasterLocations],
+    );
+
+    const debouncedSetViewport = useDebouncedCallback(setViewport, 300);
 
     const visiblePolygons = polygons.filter((polygon) => {
         const key = normalizeClassification(polygon.classification ?? null);
@@ -274,8 +373,9 @@ const Dashboard = () => {
                     <MapView
                         imageOverlayMode={imageOverlayMode}
                         imageOverlayOpacity={imageOverlayOpacity}
+                        isLoading={isLoadingLocations}
                         polygons={visiblePolygons}
-                        onViewportChange={setViewport}
+                        onViewportChange={debouncedSetViewport}
                         disablePolygons={disableAllArtifacts}
                         flyTarget={flyTarget}
                     />
