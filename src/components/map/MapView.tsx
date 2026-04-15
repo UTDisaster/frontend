@@ -255,10 +255,24 @@ const PolygonLayer = ({ polygons }: { polygons: MapPolygon[] }) => {
 };
 
 const PolygonWithStyle = ({ polygon }: { polygon: MapPolygon }) => {
+    const map = useMap();
     const classificationKey = normalizeClassification(
         polygon.classification ?? null,
     );
     const colors = classificationColors[classificationKey];
+
+    // Depend on polygon.id (stable per entity) rather than .coordinates
+    // (fresh array reference every parent render).
+    const handleClick = useCallback(() => {
+        const coords = polygon.coordinates;
+        if (coords.length === 0) return;
+        const centroidLat =
+            coords.reduce((sum, c) => sum + c[0], 0) / coords.length;
+        const centroidLng =
+            coords.reduce((sum, c) => sum + c[1], 0) / coords.length;
+        map.flyTo([centroidLat, centroidLng], 18, { duration: 0.8 });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [map, polygon.id]);
 
     return (
         <Polygon
@@ -270,6 +284,7 @@ const PolygonWithStyle = ({ polygon }: { polygon: MapPolygon }) => {
                 fillOpacity: 0.3,
                 weight: 2,
             }}
+            eventHandlers={{ click: handleClick }}
         >
             <Popup>
                 <div className="min-w-[180px] text-sm text-slate-900">
@@ -325,6 +340,28 @@ const FlyToHandler = ({ target }: { target: FlyTarget | null }) => {
     return null;
 };
 
+const InvalidateSizeHandler = () => {
+    const map = useMap();
+
+    useEffect(() => {
+        // Kick an initial invalidate after first paint (fixes gray-tile on mount).
+        const timer = setTimeout(() => map.invalidateSize(), 100);
+
+        // Also watch for container resizes (sidebar toggle, window resize)
+        // so the fix covers the full lifecycle, not just initial mount.
+        const container = map.getContainer();
+        const observer = new ResizeObserver(() => map.invalidateSize());
+        observer.observe(container);
+
+        return () => {
+            clearTimeout(timer);
+            observer.disconnect();
+        };
+    }, [map]);
+
+    return null;
+};
+
 interface MapViewProps {
     imageOverlayOpacity?: number;
     imageOverlayMode?: ImageOverlayMode;
@@ -332,6 +369,7 @@ interface MapViewProps {
     onViewportChange?: (bbox: ViewportBBox) => void;
     disablePolygons?: boolean;
     flyTarget?: FlyTarget | null;
+    isLoading?: boolean;
 }
 
 const MapView = ({
@@ -341,10 +379,12 @@ const MapView = ({
     onViewportChange,
     disablePolygons = false,
     flyTarget = null,
+    isLoading = false,
 }: MapViewProps) => {
     const polygonsToRender = disablePolygons ? [] : polygons;
     const [bbox, setBbox] = useState<ViewportBBox | null>(null);
     const [imagePairs, setImagePairs] = useState<RenderableImagePair[]>([]);
+    const [isLoadingTiles, setIsLoadingTiles] = useState(false);
     const requestAbortRef = useRef<AbortController | null>(null);
     const bboxRef = useRef<ViewportBBox | null>(null);
 
@@ -365,6 +405,7 @@ const MapView = ({
         const controller = new AbortController();
         requestAbortRef.current = controller;
 
+        setIsLoadingTiles(true);
         const fetchImagePairs = async () => {
             try {
                 const response = await fetch(buildImagePairQuery(bbox), {
@@ -404,6 +445,10 @@ const MapView = ({
                 if (controller.signal.aborted) return;
                 console.error("Failed to fetch image pairs:", error);
                 setImagePairs([]);
+            } finally {
+                if (!controller.signal.aborted) {
+                    setIsLoadingTiles(false);
+                }
             }
         };
 
@@ -438,30 +483,38 @@ const MapView = ({
         return clipOverlappingOverlays(filtered);
     }, [imageOverlayMode, imagePairs]);
 
+    const showLoadingBar = isLoading || isLoadingTiles;
+
     return (
-        <MapContainer
-            center={DEFAULT_CENTER}
-            zoom={DEFAULT_ZOOM}
-            className="h-full w-full"
-            scrollWheelZoom
-            zoomControl={false}
-        >
-            <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <ViewportWatcher onViewportChange={handleViewportChange} />
-            <FlyToHandler target={flyTarget} />
-            {visibleOverlays.map((overlay) => (
-                <ImageOverlay
-                    key={`${overlay.id}-${overlay.url}`}
-                    url={overlay.url}
-                    bounds={overlay.bounds}
-                    opacity={imageOverlayOpacity}
+        <div className="relative h-full w-full">
+            {showLoadingBar && (
+                <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-[1000]" />
+            )}
+            <MapContainer
+                center={DEFAULT_CENTER}
+                zoom={DEFAULT_ZOOM}
+                className="h-full w-full"
+                scrollWheelZoom
+                zoomControl={false}
+            >
+                <InvalidateSizeHandler />
+                <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-            ))}
-            <PolygonLayer polygons={polygonsToRender} />
-        </MapContainer>
+                <ViewportWatcher onViewportChange={handleViewportChange} />
+                <FlyToHandler target={flyTarget} />
+                {visibleOverlays.map((overlay) => (
+                    <ImageOverlay
+                        key={`${overlay.id}-${overlay.url}`}
+                        url={overlay.url}
+                        bounds={overlay.bounds}
+                        opacity={imageOverlayOpacity}
+                    />
+                ))}
+                <PolygonLayer polygons={polygonsToRender} />
+            </MapContainer>
+        </div>
     );
 };
 
