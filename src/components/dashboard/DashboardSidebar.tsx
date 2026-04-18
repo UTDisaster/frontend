@@ -1,4 +1,10 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Info, MapPin } from "lucide-react";
+import {
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Info,
+    MapPin,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -114,9 +120,11 @@ const DashboardSidebar = ({
                            shadow-xl backdrop-blur-md"
             >
                 <div className="flex h-14 items-center justify-between border-b border-slate-900/10 px-4">
-                    <p className="font-display text-sm font-bold text-slate-900">
-                        Menu
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="font-display text-sm font-bold text-slate-900">
+                            Menu
+                        </p>
+                    </div>
                     <button
                         type="button"
                         className="grid h-8 w-8 place-items-center rounded-lg
@@ -239,21 +247,33 @@ const DashboardSidebar = ({
                                                text-slate-600 transition hover:bg-slate-100
                                                disabled:opacity-40 disabled:pointer-events-none"
                                     disabled={currentLocationIndex <= 0}
-                                    onClick={() => onLocationNavigate?.(currentLocationIndex - 1)}
+                                    onClick={() =>
+                                        onLocationNavigate?.(
+                                            currentLocationIndex - 1,
+                                        )
+                                    }
                                     aria-label="Previous location"
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </button>
                                 <span className="text-sm font-medium text-slate-700">
-                                    {currentLocationIndex + 1} / {disasterLocations.length}
+                                    {currentLocationIndex + 1} /{" "}
+                                    {disasterLocations.length}
                                 </span>
                                 <button
                                     type="button"
                                     className="grid h-7 w-7 place-items-center rounded-lg
                                                text-slate-600 transition hover:bg-slate-100
                                                disabled:opacity-40 disabled:pointer-events-none"
-                                    disabled={currentLocationIndex >= disasterLocations.length - 1}
-                                    onClick={() => onLocationNavigate?.(currentLocationIndex + 1)}
+                                    disabled={
+                                        currentLocationIndex >=
+                                        disasterLocations.length - 1
+                                    }
+                                    onClick={() =>
+                                        onLocationNavigate?.(
+                                            currentLocationIndex + 1,
+                                        )
+                                    }
                                     aria-label="Next location"
                                 >
                                     <ChevronRight className="h-4 w-4" />
@@ -269,7 +289,9 @@ const DashboardSidebar = ({
                                                     ? "bg-blue-50 font-semibold text-blue-700"
                                                     : "text-slate-700 hover:bg-slate-100"
                                             }`}
-                                            onClick={() => onLocationNavigate?.(i)}
+                                            onClick={() =>
+                                                onLocationNavigate?.(i)
+                                            }
                                         >
                                             Tile {i + 1}
                                             <span className="ml-1 text-xs text-slate-400">

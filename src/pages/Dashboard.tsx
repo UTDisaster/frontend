@@ -10,6 +10,7 @@ import ControlPanel, {
 } from "@components/controls/ControlPanel";
 import DashboardSidebar from "@components/dashboard/DashboardSidebar";
 import DisasterInfoPanel from "@components/dashboard/DisasterInfoPanel";
+import StatusPill from "@components/dashboard/StatusPill";
 import ErrorBoundary from "@components/ErrorBoundary";
 import MapView, {
     type FlyTarget,
@@ -19,6 +20,10 @@ import {
     normalizeClassification,
     type MapPolygon,
 } from "@components/map/types";
+import {
+    useBackendStatus,
+    useBackendStatusContext,
+} from "../contexts/BackendStatusContext";
 
 const API_BASE_FALLBACK = "http://127.0.0.1:8000";
 
@@ -142,6 +147,7 @@ function featuresToMapPolygons(features: unknown[]): MapPolygon[] {
 const Dashboard = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isDisasterInfoOpen, setIsDisasterInfoOpen] = useState(false);
+    const [isOverlayMenuOpen, setIsOverlayMenuOpen] = useState(false);
     const [imageOverlayMode, setImageOverlayMode] =
         useState<ImageOverlayMode>("post");
     const [imageOverlayOpacity, setImageOverlayOpacity] = useState(0.8);
@@ -172,6 +178,9 @@ const Dashboard = () => {
     const [currentLocationIndex, setCurrentLocationIndex] = useState(0);
     const [viewport, setViewport] = useState<ViewportBBox | null>(null);
     const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
+    const { reportFetchSuccess, reportFetchFailure } =
+        useBackendStatusContext();
+    const backend = useBackendStatus();
 
     const VALID_OVERLAY_MODES: ReadonlySet<ImageOverlayMode> = new Set([
         "pre",
@@ -248,6 +257,7 @@ const Dashboard = () => {
             .then((data: { features?: unknown[] }) => {
                 // Advance the bounds cache only on successful delivery.
                 commitBounds(fetchBounds);
+                reportFetchSuccess();
                 // Merge into cache map keyed by id to deduplicate across fetches.
                 const newPolygons = featuresToMapPolygons(data.features ?? []);
                 for (const p of newPolygons) {
@@ -264,14 +274,22 @@ const Dashboard = () => {
             })
             .catch((error) => {
                 if (controller.signal.aborted) return;
-                console.error("Failed to fetch locations:", error);
+                const msg =
+                    error instanceof Error ? error.message : String(error);
+                reportFetchFailure(msg);
             })
             .finally(() => {
                 if (!controller.signal.aborted) setIsLoadingLocations(false);
             });
 
         return () => controller.abort();
-    }, [viewport, checkBounds, commitBounds]);
+    }, [
+        viewport,
+        checkBounds,
+        commitBounds,
+        reportFetchSuccess,
+        reportFetchFailure,
+    ]);
 
     // Expose a manual invalidation for future filter-reset UX; keeps the
     // reset path in scope so the session cache can be cleared deliberately.
@@ -295,6 +313,7 @@ const Dashboard = () => {
                 r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
             )
             .then((data: { features?: ApiLocationFeature[] }) => {
+                reportFetchSuccess();
                 const byPair = new Map<
                     string,
                     { lats: number[]; lngs: number[]; count: number }
@@ -337,11 +356,13 @@ const Dashboard = () => {
             })
             .catch((error) => {
                 if (controller.signal.aborted) return;
-                console.error("Failed to fetch disaster locations:", error);
+                const msg =
+                    error instanceof Error ? error.message : String(error);
+                reportFetchFailure(msg);
             });
 
         return () => controller.abort();
-    }, []);
+    }, [reportFetchSuccess, reportFetchFailure]);
 
     const handleLocationNavigate = useCallback(
         (index: number) => {
@@ -398,7 +419,19 @@ const Dashboard = () => {
                         [key]: enabled,
                     }));
                 }}
+                onOverlayMenuOpenChange={setIsOverlayMenuOpen}
             />
+            <div
+                className={`fixed right-4 z-[1000] transition-[top] duration-200 ${
+                    isOverlayMenuOpen ? "top-[28rem]" : "top-20"
+                }`}
+            >
+                <StatusPill
+                    status={backend.status}
+                    lastError={backend.lastError}
+                    lastSeen={backend.lastSeen}
+                />
+            </div>
             <DashboardSidebar
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
