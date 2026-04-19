@@ -4,6 +4,8 @@ import ChatDock, { type ChatAction } from "@components/chat/ChatDock";
 import { getChatRuntimeConfig } from "@components/chat/config";
 import { useBoundsCache } from "../hooks/useBoundsCache";
 import { useDebouncedCallback } from "../hooks/useDebouncedCallback";
+import { useInitialViewport } from "../hooks/useInitialViewport";
+import { saveViewport } from "../lib/viewportStorage";
 import ControlPanel, {
     type ImageOverlayMode,
     type LocationToggleState,
@@ -354,6 +356,17 @@ const Dashboard = () => {
 
     const debouncedSetViewport = useDebouncedCallback(setViewport, 300);
 
+    const { apiBaseUrl } = getChatRuntimeConfig();
+    const apiBase = apiBaseUrl || API_BASE_FALLBACK;
+    const initialViewport = useInitialViewport(apiBase, "hurricane-florence");
+
+    const debouncedSaveViewport = useDebouncedCallback(
+        (center: [number, number], zoom: number) => {
+            saveViewport({ center, zoom, ts: Date.now() });
+        },
+        2000,
+    );
+
     const visiblePolygons = polygons.filter((polygon) => {
         const key = normalizeClassification(polygon.classification ?? null);
         return locationToggles[key];
@@ -370,15 +383,23 @@ const Dashboard = () => {
                         />
                     }
                 >
-                    <MapView
-                        imageOverlayMode={imageOverlayMode}
-                        imageOverlayOpacity={imageOverlayOpacity}
-                        isLoading={isLoadingLocations}
-                        polygons={visiblePolygons}
-                        onViewportChange={debouncedSetViewport}
-                        disablePolygons={disableAllArtifacts}
-                        flyTarget={flyTarget}
-                    />
+                    {!initialViewport.ready && (
+                        <div className="h-full w-full animate-pulse bg-slate-300" />
+                    )}
+                    {initialViewport.ready && (
+                        <MapView
+                            imageOverlayMode={imageOverlayMode}
+                            imageOverlayOpacity={imageOverlayOpacity}
+                            isLoading={isLoadingLocations}
+                            polygons={visiblePolygons}
+                            onViewportChange={debouncedSetViewport}
+                            disablePolygons={disableAllArtifacts}
+                            flyTarget={flyTarget}
+                            initialCenter={initialViewport.center}
+                            initialZoom={initialViewport.zoom}
+                            onViewportSettle={debouncedSaveViewport}
+                        />
+                    )}
                 </ErrorBoundary>
             </div>
 

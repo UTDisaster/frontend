@@ -64,6 +64,7 @@ interface VisibleOverlay {
 
 interface ViewportWatcherProps {
     onViewportChange: (bbox: ViewportBBox) => void;
+    onViewportSettle?: (center: [number, number], zoom: number) => void;
 }
 
 const boundsToBbox = (bounds: LatLngBounds): ViewportBBox => ({
@@ -227,16 +228,31 @@ const clipOverlappingOverlays = (
     return result;
 };
 
-const ViewportWatcher = ({ onViewportChange }: ViewportWatcherProps) => {
+const ViewportWatcher = ({
+    onViewportChange,
+    onViewportSettle,
+}: ViewportWatcherProps) => {
     const map = useMap();
 
     useEffect(() => {
         onViewportChange(boundsToBbox(map.getBounds()));
     }, [map, onViewportChange]);
 
+    const emitSettle = () => {
+        if (!onViewportSettle) return;
+        const c = map.getCenter();
+        onViewportSettle([c.lat, c.lng], map.getZoom());
+    };
+
     useMapEvents({
-        moveend: () => onViewportChange(boundsToBbox(map.getBounds())),
-        zoomend: () => onViewportChange(boundsToBbox(map.getBounds())),
+        moveend: () => {
+            onViewportChange(boundsToBbox(map.getBounds()));
+            emitSettle();
+        },
+        zoomend: () => {
+            onViewportChange(boundsToBbox(map.getBounds()));
+            emitSettle();
+        },
     });
 
     return null;
@@ -370,6 +386,9 @@ interface MapViewProps {
     disablePolygons?: boolean;
     flyTarget?: FlyTarget | null;
     isLoading?: boolean;
+    initialCenter?: [number, number];
+    initialZoom?: number;
+    onViewportSettle?: (center: [number, number], zoom: number) => void;
 }
 
 const MapView = ({
@@ -380,6 +399,9 @@ const MapView = ({
     disablePolygons = false,
     flyTarget = null,
     isLoading = false,
+    initialCenter = DEFAULT_CENTER,
+    initialZoom = DEFAULT_ZOOM,
+    onViewportSettle,
 }: MapViewProps) => {
     const polygonsToRender = disablePolygons ? [] : polygons;
     const [bbox, setBbox] = useState<ViewportBBox | null>(null);
@@ -491,8 +513,8 @@ const MapView = ({
                 <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-[1000]" />
             )}
             <MapContainer
-                center={DEFAULT_CENTER}
-                zoom={DEFAULT_ZOOM}
+                center={initialCenter}
+                zoom={initialZoom}
                 className="h-full w-full"
                 scrollWheelZoom
                 zoomControl={false}
@@ -502,7 +524,10 @@ const MapView = ({
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                <ViewportWatcher onViewportChange={handleViewportChange} />
+                <ViewportWatcher
+                    onViewportChange={handleViewportChange}
+                    onViewportSettle={onViewportSettle}
+                />
                 <FlyToHandler target={flyTarget} />
                 {visibleOverlays.map((overlay) => (
                     <ImageOverlay
