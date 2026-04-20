@@ -1,3 +1,5 @@
+import { MapPin } from 'lucide-react';
+
 import { formatMessageTime } from '../util';
 import type { ChatMessage } from '../types';
 
@@ -18,6 +20,12 @@ const ChatBubble = ({ message }: ChatBubbleProps) => {
                 }`}
             >
                 <p className="text-sm leading-relaxed">{message.text}</p>
+                {message.hasFlyTo && (
+                    <p className="mt-1.5 flex items-center gap-1 text-xs text-blue-600">
+                        <MapPin className="h-3 w-3" />
+                        Map moved to this location
+                    </p>
+                )}
                 <p
                     className={`mt-1 text-xs ${
                         isUser ? 'text-slate-300' : 'text-slate-500'

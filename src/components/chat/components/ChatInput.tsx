@@ -39,7 +39,7 @@ const ChatInput = ({ draft, onDraftChange, onSend }: ChatInputProps) => {
                             event.currentTarget.form?.requestSubmit();
                         }
                     }}
-                    placeholder="Type your message..."
+                    placeholder="Ask about damage levels, addresses, or streets..."
                     rows={1}
                     className="w-full resize-none bg-transparent py-1 text-sm leading-5 text-slate-900 outline-none placeholder:text-slate-400"
                 />

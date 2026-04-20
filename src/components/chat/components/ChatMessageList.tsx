@@ -14,6 +14,7 @@ const buildSuggestedPrompts = (disasterContext: DisasterContext | undefined): Su
     return [
         { label: 'Damage summary', text: `Damage summary for ${name}` },
         { label: 'Severely damaged buildings', text: 'How many severely damaged buildings are there?' },
+        { label: 'Damage on a specific street', text: 'Buildings damaged on a specific street?' },
         { label: 'Nearby damage', text: 'Show me damage near the city center' },
     ];
 };
