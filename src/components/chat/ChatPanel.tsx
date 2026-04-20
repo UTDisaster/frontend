@@ -4,6 +4,7 @@ import type { FormEventHandler } from "react";
 import type { ViewportBBox } from "@components/map/MapView";
 
 import type { ChatAction } from "./ChatDock";
+import type { DisasterContext } from "./types";
 import { createChatHistoryClient } from "./clients/history/createChatHistoryClient";
 import { createMockChatHistoryClient } from "./clients/history/mockChatHistoryClient";
 import type { ChatHistoryClient } from "./clients/history/types";
@@ -34,6 +35,7 @@ interface ChatPanelProps {
     setIsOpen: (isOpen: boolean) => void;
     viewport: ViewportBBox | null;
     onAction?: (action: ChatAction) => void;
+    disasterContext?: DisasterContext;
 }
 
 const runtimeConfig = getChatRuntimeConfig();
@@ -125,7 +127,7 @@ const hydrateConversations = async (
     );
 };
 
-const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
+const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanelProps) => {
     const [conversations, setConversations] =
         useState<ChatConversation[]>(initialConversations);
     const [activeConversationId, setActiveConversationId] =
@@ -357,6 +359,12 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
             if (viewport) {
                 body.viewport = viewport;
             }
+            // Additive disaster context -- backend uses these to scope Gemini to the selected disaster.
+            // Field names: disaster_id (slug) + disaster_name (human-readable label).
+            if (disasterContext) {
+                body.disaster_id = disasterContext.id;
+                body.disaster_name = disasterContext.name;
+            }
             fetch(`${apiBaseUrl}/chat/message`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -461,6 +469,10 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
         setIsHistoryOpen(false);
     };
 
+    const isEmptyChat =
+        effectiveActiveId === NEW_CHAT_ID ||
+        (activeConversation?.messages.length ?? 0) === 0;
+
     return (
         <section
             className="w-[720px]
@@ -483,11 +495,15 @@ const ChatPanel = ({ setIsOpen, viewport, onAction }: ChatPanelProps) => {
                 onCloseHistory={() => setIsHistoryOpen(false)}
                 onSelectConversation={handleSelectConversation}
                 onNewChat={handleNewConversation}
+                disasterContext={disasterContext}
             />
             <ChatMessageList
                 messages={activeConversation?.messages ?? []}
                 listRef={listRef}
                 isThinking={isThinking}
+                isEmptyChat={isEmptyChat}
+                disasterContext={disasterContext}
+                onSuggestedPrompt={(prompt) => setDraft(prompt)}
             />
             <ChatInput
                 draft={draft}

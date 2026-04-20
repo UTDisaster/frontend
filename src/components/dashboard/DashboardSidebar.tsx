@@ -12,6 +12,7 @@ import {
     type ClassificationKey,
     type MapPolygon,
 } from "@components/map/types";
+import { DISASTERS } from "../../data/disasters";
 
 interface DisasterLocation {
     imagePairId: string;
@@ -27,11 +28,9 @@ interface DashboardSidebarProps {
     disasterLocations?: DisasterLocation[];
     currentLocationIndex?: number;
     onLocationNavigate?: (index: number) => void;
+    selectedDisasterId: string;
+    onDisasterChange: (id: string) => void;
 }
-
-const DISASTERS = [
-    { id: "myrtle-beach", label: "Hurricane — Myrtle Beach, SC" },
-];
 
 const CLASSIFICATION_ORDER: ClassificationKey[] = [
     "destroyed",
@@ -79,8 +78,9 @@ const DashboardSidebar = ({
     disasterLocations = [],
     currentLocationIndex = 0,
     onLocationNavigate,
+    selectedDisasterId,
+    onDisasterChange,
 }: DashboardSidebarProps) => {
-    const [selectedDisaster, setSelectedDisaster] = useState(DISASTERS[0].id);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -104,7 +104,7 @@ const DashboardSidebar = ({
     if (!isOpen) return null;
 
     const selected =
-        DISASTERS.find((d) => d.id === selectedDisaster) ?? DISASTERS[0];
+        DISASTERS.find((d) => d.id === selectedDisasterId) ?? DISASTERS[0];
 
     return (
         <>
@@ -159,7 +159,7 @@ const DashboardSidebar = ({
                                 aria-controls="disaster-listbox"
                             >
                                 <span className="truncate">
-                                    {selected.label}
+                                    {selected.name}
                                 </span>
                                 <ChevronDown
                                     className={`h-4 w-4 text-slate-500 transition ${
@@ -180,22 +180,22 @@ const DashboardSidebar = ({
                                             key={d.id}
                                             role="option"
                                             aria-selected={
-                                                d.id === selectedDisaster
+                                                d.id === selectedDisasterId
                                             }
                                         >
                                             <button
                                                 type="button"
                                                 className={`w-full px-3 py-2 text-left text-sm transition hover:bg-slate-100 ${
-                                                    d.id === selectedDisaster
+                                                    d.id === selectedDisasterId
                                                         ? "font-semibold text-blue-600"
                                                         : "text-slate-700"
                                                 }`}
                                                 onClick={() => {
-                                                    setSelectedDisaster(d.id);
+                                                    onDisasterChange(d.id);
                                                     setIsDropdownOpen(false);
                                                 }}
                                             >
-                                                {d.label}
+                                                {d.name}
                                             </button>
                                         </li>
                                     ))}

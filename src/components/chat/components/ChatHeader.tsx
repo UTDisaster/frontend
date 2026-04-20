@@ -1,5 +1,6 @@
-import { History, SquarePen, X } from 'lucide-react';
+import { History, MapPin, SquarePen, X } from 'lucide-react';
 
+import type { DisasterContext } from '../types';
 import type { ChatConversation } from '../types';
 import ChatHistoryMenu from './ChatHistoryMenu';
 
@@ -15,6 +16,7 @@ interface ChatHeaderProps {
     onCloseHistory: () => void;
     onSelectConversation: (conversationId: string) => void;
     onNewChat: () => void;
+    disasterContext?: DisasterContext;
 }
 
 const ChatHeader = ({
@@ -29,6 +31,7 @@ const ChatHeader = ({
     onCloseHistory,
     onSelectConversation,
     onNewChat,
+    disasterContext,
 }: ChatHeaderProps) => {
     return (
         <header className="relative flex items-center justify-between border-b border-slate-900/10 px-5 py-4">
@@ -37,6 +40,12 @@ const ChatHeader = ({
                 <p className="text-xs text-slate-500">
                     {connectionLabel} · {conversationTitle}
                 </p>
+                {disasterContext && (
+                    <p className="flex items-center gap-1 text-xs text-blue-600 mt-0.5">
+                        <MapPin className="h-3 w-3" />
+                        Talking about: {disasterContext.name}
+                    </p>
+                )}
             </div>
             <div className="flex items-center gap-2">
                 <button

@@ -19,3 +19,9 @@ export interface ChatConversation {
     updatedAt: string;
     messages: ChatMessage[];
 }
+
+/** Identifies which disaster the user currently has selected in the sidebar. */
+export interface DisasterContext {
+    id: string;
+    name: string;
+}
