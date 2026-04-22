@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import ChatDock, { type ChatAction } from "@components/chat/ChatDock";
+import { DISASTERS } from "../data/disasters";
 import { getChatRuntimeConfig } from "@components/chat/config";
 import { useBoundsCache } from "../hooks/useBoundsCache";
 import { useDebouncedCallback } from "../hooks/useDebouncedCallback";
@@ -183,6 +184,10 @@ const Dashboard = () => {
     const { reportFetchSuccess, reportFetchFailure } =
         useBackendStatusContext();
     const backend = useBackendStatus();
+    const [selectedDisasterId, setSelectedDisasterId] = useState<string>(DISASTERS[0].id);
+
+    const selectedDisasterContext =
+        DISASTERS.find((d) => d.id === selectedDisasterId) ?? DISASTERS[0];
 
     const VALID_OVERLAY_MODES: ReadonlySet<ImageOverlayMode> = new Set([
         "pre",
@@ -464,8 +469,10 @@ const Dashboard = () => {
                 disasterLocations={disasterLocations}
                 currentLocationIndex={currentLocationIndex}
                 onLocationNavigate={handleLocationNavigate}
+                selectedDisasterId={selectedDisasterId}
+                onDisasterChange={setSelectedDisasterId}
             />
-            <ChatDock viewport={viewport} onAction={handleChatAction} />
+            <ChatDock viewport={viewport} onAction={handleChatAction} disasterContext={selectedDisasterContext} />
             <DisasterInfoPanel
                 isOpen={isDisasterInfoOpen}
                 onClose={() => setIsDisasterInfoOpen(false)}
