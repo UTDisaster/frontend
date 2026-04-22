@@ -11,6 +11,8 @@ export interface ChatMessage {
     sender: Sender;
     text: string;
     sentAt: string;
+    /** True when the agent response triggered a map flyTo action. */
+    hasFlyTo?: boolean;
 }
 
 export interface ChatConversation {

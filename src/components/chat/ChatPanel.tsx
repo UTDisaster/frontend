@@ -389,11 +389,14 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
                         actions?: ChatAction[];
                     }) => {
                         backendConversationIdRef.current = data.conversation_id;
+                        const hasFlyTo = Array.isArray(data.actions) &&
+                            data.actions.some((a) => a.type === "flyTo");
                         const agentMessage: ChatMessage = {
                             id: createMessageId("agent"),
                             sender: "agent",
                             text: data.reply,
                             sentAt: new Date().toISOString(),
+                            hasFlyTo,
                         };
                         setConversations((current) =>
                             appendMessageToConversation(
