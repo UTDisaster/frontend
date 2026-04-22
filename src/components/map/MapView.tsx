@@ -17,6 +17,7 @@ import {
 } from "react-leaflet";
 
 import type { ImageOverlayMode } from "@components/controls/ControlPanel";
+import { useBackendStatusContext } from "../../contexts/BackendStatusContext";
 import { normalizeClassification, type MapPolygon } from "./types";
 
 const DEFAULT_CENTER: [number, number] = [33.6036, -79.0346];
@@ -387,6 +388,8 @@ const MapView = ({
     const [isLoadingTiles, setIsLoadingTiles] = useState(false);
     const requestAbortRef = useRef<AbortController | null>(null);
     const bboxRef = useRef<ViewportBBox | null>(null);
+    const { reportFetchSuccess, reportFetchFailure } =
+        useBackendStatusContext();
 
     const handleViewportChange = useCallback(
         (nextBbox: ViewportBBox) => {
@@ -419,6 +422,7 @@ const MapView = ({
                 }
 
                 const payload = (await response.json()) as ApiImagePairResponse;
+                reportFetchSuccess();
                 const overlays: RenderableImagePair[] = (
                     payload.image_pairs ?? []
                 )
@@ -443,7 +447,9 @@ const MapView = ({
                 setImagePairs(overlays);
             } catch (error) {
                 if (controller.signal.aborted) return;
-                console.error("Failed to fetch image pairs:", error);
+                const msg =
+                    error instanceof Error ? error.message : String(error);
+                reportFetchFailure(msg);
                 setImagePairs([]);
             } finally {
                 if (!controller.signal.aborted) {
@@ -457,7 +463,7 @@ const MapView = ({
         return () => {
             controller.abort();
         };
-    }, [bbox]);
+    }, [bbox, reportFetchSuccess, reportFetchFailure]);
 
     const visibleOverlays = useMemo(() => {
         if (imageOverlayMode === "none") {
