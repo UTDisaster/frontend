@@ -74,7 +74,10 @@ const computeStats = (polygons: MapPolygon[]) => {
 
     const hasBounds = Number.isFinite(minLat);
 
-    return { counts, bounds: hasBounds ? { minLat, maxLat, minLng, maxLng } : null };
+    return {
+        counts,
+        bounds: hasBounds ? { minLat, maxLat, minLng, maxLng } : null,
+    };
 };
 
 const DisasterInfoPanel = ({
@@ -217,7 +220,10 @@ const DisasterInfoPanel = ({
                                         ? Math.round((count / total) * 100)
                                         : 0;
                                 return (
-                                    <div key={key} className="flex items-center gap-3">
+                                    <div
+                                        key={key}
+                                        className="flex items-center gap-3"
+                                    >
                                         <span
                                             className={`h-3 w-3 rounded-full ${classificationColors[key]}`}
                                         />

@@ -49,11 +49,17 @@ export function useInitialViewport(
         const url = `${base}/locations/hotspots?disaster_id=${encodeURIComponent(disasterId)}&limit=1`;
 
         fetch(url, { signal: controller.signal })
-            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+            .then((r) =>
+                r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
+            )
             .then((data: HotspotsResponse) => {
                 const { lat, lng } = (data.hotspots?.[0] ?? {}) as Hotspot;
                 if (typeof lat === "number" && typeof lng === "number") {
-                    setState({ center: [lat, lng], zoom: HOTSPOT_ZOOM, ready: true });
+                    setState({
+                        center: [lat, lng],
+                        zoom: HOTSPOT_ZOOM,
+                        ready: true,
+                    });
                 } else setState(fallback(true));
             })
             .catch(() => setState(fallback(true)))

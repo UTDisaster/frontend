@@ -242,7 +242,7 @@ const Dashboard = () => {
         const url = `${base.replace(/\/+$/, "")}/locations?${params.toString()}`;
         const controller = new AbortController();
 
-        setIsLoadingLocations(true);
+        queueMicrotask(() => setIsLoadingLocations(true));
         fetch(url, { signal: controller.signal })
             .then((r) =>
                 r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
