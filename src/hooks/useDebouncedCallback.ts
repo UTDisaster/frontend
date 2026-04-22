@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 /**
  * Returns a debounced version of the given callback.
  * The returned function delays invocation until `delay` ms have elapsed
  * since the last call.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useDebouncedCallback<A extends any[]>(
+export function useDebouncedCallback<A extends unknown[]>(
     callback: (...args: A) => void,
     delay: number,
 ): (...args: A) => void {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const callbackRef = useRef(callback);
-    callbackRef.current = callback;
+    useLayoutEffect(() => {
+        callbackRef.current = callback;
+    });
 
     // Clear pending timer on unmount to avoid firing against an unmounted component
     useEffect(() => {

@@ -1,11 +1,20 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
+import { getChatRuntimeConfig } from "@components/chat/config";
 import {
     normalizeClassification,
     type ClassificationKey,
     type MapPolygon,
 } from "@components/map/types";
+
+const API_BASE_FALLBACK = "http://127.0.0.1:8000";
+const DISASTER_ID = "hurricane-florence";
+
+interface DisasterSummary {
+    description?: string;
+    name?: string;
+}
 
 interface DisasterInfoPanelProps {
     isOpen: boolean;
@@ -65,7 +74,10 @@ const computeStats = (polygons: MapPolygon[]) => {
 
     const hasBounds = Number.isFinite(minLat);
 
-    return { counts, bounds: hasBounds ? { minLat, maxLat, minLng, maxLng } : null };
+    return {
+        counts,
+        bounds: hasBounds ? { minLat, maxLat, minLng, maxLng } : null,
+    };
 };
 
 const DisasterInfoPanel = ({
@@ -74,6 +86,8 @@ const DisasterInfoPanel = ({
     polygons,
 }: DisasterInfoPanelProps) => {
     const dialogRef = useRef<HTMLDivElement>(null);
+    const [summary, setSummary] = useState<DisasterSummary | null>(null);
+    const [summaryFailed, setSummaryFailed] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -86,6 +100,26 @@ const DisasterInfoPanel = ({
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [isOpen, onClose]);
+
+    useEffect(() => {
+        const { apiBaseUrl } = getChatRuntimeConfig();
+        const base = (apiBaseUrl || API_BASE_FALLBACK).replace(/\/+$/, "");
+        const controller = new AbortController();
+
+        fetch(`${base}/disasters/${DISASTER_ID}/summary`, {
+            signal: controller.signal,
+        })
+            .then((r) =>
+                r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
+            )
+            .then((data: DisasterSummary) => setSummary(data))
+            .catch(() => {
+                if (controller.signal.aborted) return;
+                setSummaryFailed(true);
+            });
+
+        return () => controller.abort();
+    }, []);
 
     if (!isOpen) return null;
 
@@ -131,14 +165,21 @@ const DisasterInfoPanel = ({
                 <div className="space-y-4 px-5 py-4">
                     <section>
                         <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Description
+                            {summary?.name ?? "Hurricane Florence"}
                         </h3>
-                        <p className="text-sm leading-relaxed text-slate-700">
-                            Hurricane damage assessment for the Myrtle Beach,
-                            South Carolina region. Satellite imagery and
-                            location data are used to classify structural damage
-                            across the affected area.
-                        </p>
+                        {summary?.description ? (
+                            <p className="text-sm leading-relaxed text-slate-700">
+                                {summary.description}
+                            </p>
+                        ) : summaryFailed ? (
+                            <p className="text-sm leading-relaxed text-slate-500 italic">
+                                Summary unavailable.
+                            </p>
+                        ) : (
+                            <p className="text-sm leading-relaxed text-slate-400">
+                                Loading summary...
+                            </p>
+                        )}
                     </section>
 
                     {bounds && (
@@ -179,7 +220,10 @@ const DisasterInfoPanel = ({
                                         ? Math.round((count / total) * 100)
                                         : 0;
                                 return (
-                                    <div key={key} className="flex items-center gap-3">
+                                    <div
+                                        key={key}
+                                        className="flex items-center gap-3"
+                                    >
                                         <span
                                             className={`h-3 w-3 rounded-full ${classificationColors[key]}`}
                                         />
