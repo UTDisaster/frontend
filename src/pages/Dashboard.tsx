@@ -12,6 +12,11 @@ import ControlPanel, {
     type LocationToggleState,
 } from "@components/controls/ControlPanel";
 import DashboardSidebar from "@components/dashboard/DashboardSidebar";
+import {
+    DASHBOARD_VIEW_PATHS,
+    getDashboardViewFromPath,
+    type DashboardView,
+} from "@components/dashboard/navigation";
 import DisasterInfoPanel from "@components/dashboard/DisasterInfoPanel";
 import StatusPill from "@components/dashboard/StatusPill";
 import ErrorBoundary from "@components/ErrorBoundary";
@@ -27,6 +32,7 @@ import {
     useBackendStatus,
     useBackendStatusContext,
 } from "../contexts/BackendStatusContext";
+import VLMPredictionPage from "@components/vlm/VLMPredictionPage";
 
 const API_BASE_FALLBACK = "http://127.0.0.1:8000";
 
@@ -148,6 +154,9 @@ function featuresToMapPolygons(features: unknown[]): MapPolygon[] {
 }
 
 const Dashboard = () => {
+    const [activeView, setActiveView] = useState<DashboardView>(() =>
+        getDashboardViewFromPath(window.location.pathname),
+    );
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isDisasterInfoOpen, setIsDisasterInfoOpen] = useState(false);
     const [isOverlayMenuOpen, setIsOverlayMenuOpen] = useState(false);
@@ -188,6 +197,7 @@ const Dashboard = () => {
 
     const selectedDisasterContext =
         DISASTERS.find((d) => d.id === selectedDisasterId) ?? DISASTERS[0];
+    const isMapView = activeView === "map";
 
     const VALID_OVERLAY_MODES: ReadonlySet<ImageOverlayMode> = new Set([
         "pre",
@@ -398,40 +408,70 @@ const Dashboard = () => {
         return locationToggles[key];
     });
 
+    useEffect(() => {
+        const syncViewFromLocation = () => {
+            setActiveView(getDashboardViewFromPath(window.location.pathname));
+        };
+
+        window.addEventListener("popstate", syncViewFromLocation);
+        return () =>
+            window.removeEventListener("popstate", syncViewFromLocation);
+    }, []);
+
+    const navigateToView = useCallback((view: DashboardView) => {
+        const nextPath = DASHBOARD_VIEW_PATHS[view];
+        if (window.location.pathname !== nextPath) {
+            window.history.pushState({}, "", nextPath);
+        }
+        setActiveView(view);
+        setIsSidebarOpen(false);
+        setIsOverlayMenuOpen(false);
+        if (view !== "map") {
+            setIsDisasterInfoOpen(false);
+        }
+    }, []);
+
     return (
         <div className="relative min-h-screen h-full w-full overflow-hidden text-slate-950">
-            <div className="absolute inset-0 z-0">
-                <ErrorBoundary
-                    fallback={
-                        <div
-                            className="h-full w-full bg-slate-300"
-                            aria-hidden
-                        />
-                    }
-                >
-                    {!initialViewport.ready && (
-                        <div className="h-full w-full animate-pulse bg-slate-300" />
-                    )}
-                    {initialViewport.ready && (
-                        <MapView
-                            imageOverlayMode={imageOverlayMode}
-                            imageOverlayOpacity={imageOverlayOpacity}
-                            isLoading={isLoadingLocations}
-                            polygons={visiblePolygons}
-                            onViewportChange={debouncedSetViewport}
-                            disablePolygons={disableAllArtifacts}
-                            flyTarget={flyTarget}
-                            initialCenter={initialViewport.center}
-                            initialZoom={initialViewport.zoom}
-                            onViewportSettle={debouncedSaveViewport}
-                        />
-                    )}
-                </ErrorBoundary>
-            </div>
+            {isMapView ? (
+                <div className="absolute inset-0 z-0">
+                    <ErrorBoundary
+                        fallback={
+                            <div
+                                className="h-full w-full bg-slate-300"
+                                aria-hidden
+                            />
+                        }
+                    >
+                        {!initialViewport.ready && (
+                            <div className="h-full w-full animate-pulse bg-slate-300" />
+                        )}
+                        {initialViewport.ready && (
+                            <MapView
+                                imageOverlayMode={imageOverlayMode}
+                                imageOverlayOpacity={imageOverlayOpacity}
+                                isLoading={isLoadingLocations}
+                                polygons={visiblePolygons}
+                                onViewportChange={debouncedSetViewport}
+                                disablePolygons={disableAllArtifacts}
+                                flyTarget={flyTarget}
+                                initialCenter={initialViewport.center}
+                                initialZoom={initialViewport.zoom}
+                                onViewportSettle={debouncedSaveViewport}
+                            />
+                        )}
+                    </ErrorBoundary>
+                </div>
+            ) : (
+                <div className="relative z-0">
+                    <VLMPredictionPage />
+                </div>
+            )}
 
             <ControlPanel
                 isSidebarOpen={isSidebarOpen}
                 onMenuClick={() => setIsSidebarOpen(true)}
+                showOverlayControls={isMapView}
                 imageOverlayMode={imageOverlayMode}
                 onImageOverlayModeChange={setImageOverlayMode}
                 imageOverlayOpacity={imageOverlayOpacity}
@@ -449,7 +489,7 @@ const Dashboard = () => {
             />
             <div
                 className={`fixed right-4 z-[1000] transition-[top] duration-200 ${
-                    isOverlayMenuOpen ? "top-[28rem]" : "top-20"
+                    isMapView && isOverlayMenuOpen ? "top-[28rem]" : "top-20"
                 }`}
             >
                 <StatusPill
@@ -459,8 +499,10 @@ const Dashboard = () => {
                 />
             </div>
             <DashboardSidebar
+                activeView={activeView}
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
+                onNavigate={navigateToView}
                 onDisasterInfoClick={() => {
                     setIsSidebarOpen(false);
                     setIsDisasterInfoOpen(true);
@@ -472,12 +514,20 @@ const Dashboard = () => {
                 selectedDisasterId={selectedDisasterId}
                 onDisasterChange={setSelectedDisasterId}
             />
-            <ChatDock viewport={viewport} onAction={handleChatAction} disasterContext={selectedDisasterContext} />
-            <DisasterInfoPanel
-                isOpen={isDisasterInfoOpen}
-                onClose={() => setIsDisasterInfoOpen(false)}
-                polygons={polygons}
-            />
+            {isMapView && (
+                <>
+                    <ChatDock
+                        viewport={viewport}
+                        onAction={handleChatAction}
+                        disasterContext={selectedDisasterContext}
+                    />
+                    <DisasterInfoPanel
+                        isOpen={isDisasterInfoOpen}
+                        onClose={() => setIsDisasterInfoOpen(false)}
+                        polygons={polygons}
+                    />
+                </>
+            )}
         </div>
     );
 };

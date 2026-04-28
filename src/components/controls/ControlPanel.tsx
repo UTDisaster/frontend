@@ -27,6 +27,7 @@ interface ControlPanelProps {
     onMenuClick?: () => void;
     isSidebarOpen?: boolean;
     onOverlayMenuOpenChange?: (open: boolean) => void;
+    showOverlayControls?: boolean;
 }
 
 const imageOptions: { label: string; value: ImageOverlayMode }[] = [
@@ -59,6 +60,7 @@ const ControlPanel = ({
     onMenuClick,
     isSidebarOpen,
     onOverlayMenuOpenChange,
+    showOverlayControls = true,
 }: ControlPanelProps) => {
     const [isOverlayMenuOpen, setIsOverlayMenuOpen] = useState(false);
     const overlayMenuRef = useRef<HTMLDivElement | null>(null);
@@ -86,6 +88,12 @@ const ControlPanel = ({
         return () => document.removeEventListener("mousedown", onPointerDown);
     }, [isOverlayMenuOpen]);
 
+    useEffect(() => {
+        if (!showOverlayControls) {
+            setIsOverlayMenuOpen(false);
+        }
+    }, [showOverlayControls]);
+
     return (
         <div
             className="absolute left-4 right-4 top-4 z-[1000]
@@ -110,7 +118,7 @@ const ControlPanel = ({
                     <Menu className="h-6 w-6 text-slate-900" />
                 </button>
             )}
-            {!isSidebarOpen && (
+            {!isSidebarOpen && showOverlayControls && (
                 <div
                     ref={overlayMenuRef}
                     className="relative flex items-center gap-2

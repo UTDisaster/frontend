@@ -4,9 +4,11 @@ import {
     ChevronRight,
     Info,
     MapPin,
+    ScanSearch,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { type DashboardView } from "./navigation";
 import {
     normalizeClassification,
     type ClassificationKey,
@@ -21,8 +23,10 @@ interface DisasterLocation {
 }
 
 interface DashboardSidebarProps {
+    activeView: DashboardView;
     isOpen: boolean;
     onClose: () => void;
+    onNavigate: (view: DashboardView) => void;
     onDisasterInfoClick?: () => void;
     polygons?: MapPolygon[];
     disasterLocations?: DisasterLocation[];
@@ -71,8 +75,10 @@ const countByClassification = (polygons: MapPolygon[]) => {
 };
 
 const DashboardSidebar = ({
+    activeView,
     isOpen,
     onClose,
+    onNavigate,
     onDisasterInfoClick,
     polygons = [],
     disasterLocations = [],
@@ -105,6 +111,14 @@ const DashboardSidebar = ({
 
     const selected =
         DISASTERS.find((d) => d.id === selectedDisasterId) ?? DISASTERS[0];
+    const isMapView = activeView === "map";
+
+    const navButtonClass = (view: DashboardView) =>
+        `flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+            activeView === view
+                ? "bg-blue-50 text-blue-700"
+                : "text-slate-900 hover:bg-slate-100"
+        }`;
 
     return (
         <>
@@ -139,70 +153,72 @@ const DashboardSidebar = ({
 
                 <div className="flex-1 overflow-y-auto">
                     {/* Disaster selector */}
-                    <div
-                        ref={dropdownRef}
-                        className="border-b border-slate-200 px-4 py-3"
-                    >
-                        <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Disaster
-                        </label>
-                        <div className="relative">
-                            <button
-                                type="button"
-                                className="flex w-full items-center justify-between rounded-lg
-                                           border border-slate-300 bg-white px-3 py-2
-                                           text-left text-sm font-medium text-slate-900
-                                           transition hover:border-slate-400"
-                                onClick={() => setIsDropdownOpen((o) => !o)}
-                                aria-expanded={isDropdownOpen}
-                                aria-haspopup="listbox"
-                                aria-controls="disaster-listbox"
-                            >
-                                <span className="truncate">
-                                    {selected.name}
-                                </span>
-                                <ChevronDown
-                                    className={`h-4 w-4 text-slate-500 transition ${
-                                        isDropdownOpen ? "rotate-180" : ""
-                                    }`}
-                                />
-                            </button>
-                            {isDropdownOpen && (
-                                <ul
-                                    id="disaster-listbox"
-                                    role="listbox"
-                                    className="absolute left-0 right-0 top-full z-10 mt-1
-                                               rounded-lg border border-slate-200 bg-white
-                                               py-1 shadow-lg"
+                    {isMapView && (
+                        <div
+                            ref={dropdownRef}
+                            className="border-b border-slate-200 px-4 py-3"
+                        >
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Disaster
+                            </label>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between rounded-lg
+                                               border border-slate-300 bg-white px-3 py-2
+                                               text-left text-sm font-medium text-slate-900
+                                               transition hover:border-slate-400"
+                                    onClick={() => setIsDropdownOpen((o) => !o)}
+                                    aria-expanded={isDropdownOpen}
+                                    aria-haspopup="listbox"
+                                    aria-controls="disaster-listbox"
                                 >
-                                    {DISASTERS.map((d) => (
-                                        <li
-                                            key={d.id}
-                                            role="option"
-                                            aria-selected={
-                                                d.id === selectedDisasterId
-                                            }
-                                        >
-                                            <button
-                                                type="button"
-                                                className={`w-full px-3 py-2 text-left text-sm transition hover:bg-slate-100 ${
+                                    <span className="truncate">
+                                        {selected.name}
+                                    </span>
+                                    <ChevronDown
+                                        className={`h-4 w-4 text-slate-500 transition ${
+                                            isDropdownOpen ? "rotate-180" : ""
+                                        }`}
+                                    />
+                                </button>
+                                {isDropdownOpen && (
+                                    <ul
+                                        id="disaster-listbox"
+                                        role="listbox"
+                                        className="absolute left-0 right-0 top-full z-10 mt-1
+                                                   rounded-lg border border-slate-200 bg-white
+                                                   py-1 shadow-lg"
+                                    >
+                                        {DISASTERS.map((d) => (
+                                            <li
+                                                key={d.id}
+                                                role="option"
+                                                aria-selected={
                                                     d.id === selectedDisasterId
-                                                        ? "font-semibold text-blue-600"
-                                                        : "text-slate-700"
-                                                }`}
-                                                onClick={() => {
-                                                    onDisasterChange(d.id);
-                                                    setIsDropdownOpen(false);
-                                                }}
+                                                }
                                             >
-                                                {d.name}
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                                                <button
+                                                    type="button"
+                                                    className={`w-full px-3 py-2 text-left text-sm transition hover:bg-slate-100 ${
+                                                        d.id === selectedDisasterId
+                                                            ? "font-semibold text-blue-600"
+                                                            : "text-slate-700"
+                                                    }`}
+                                                    onClick={() => {
+                                                        onDisasterChange(d.id);
+                                                        setIsDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    {d.name}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Navigation */}
                     <nav className="border-b border-slate-200 px-4 py-3">
@@ -210,13 +226,21 @@ const DashboardSidebar = ({
                             <li>
                                 <button
                                     type="button"
-                                    className="flex w-full items-center gap-3 rounded-lg
-                                               px-3 py-2 text-left text-sm font-medium text-slate-900
-                                               transition hover:bg-slate-100"
-                                    onClick={onClose}
+                                    className={navButtonClass("map")}
+                                    onClick={() => onNavigate("map")}
                                 >
                                     <MapPin className="h-4 w-4 text-slate-600" />
                                     Map
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    type="button"
+                                    className={navButtonClass("vlm")}
+                                    onClick={() => onNavigate("vlm")}
+                                >
+                                    <ScanSearch className="h-4 w-4 text-slate-600" />
+                                    VLM Assessment
                                 </button>
                             </li>
                             <li>
@@ -235,7 +259,7 @@ const DashboardSidebar = ({
                     </nav>
 
                     {/* Location navigation */}
-                    {disasterLocations.length > 0 && (
+                    {isMapView && disasterLocations.length > 0 && (
                         <div className="border-b border-slate-200 px-4 py-3">
                             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Locations ({disasterLocations.length} tiles)
@@ -305,7 +329,7 @@ const DashboardSidebar = ({
                     )}
 
                     {/* Quick stats */}
-                    {polygons.length > 0 && (
+                    {isMapView && polygons.length > 0 && (
                         <div className="px-4 py-3">
                             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Location Summary
