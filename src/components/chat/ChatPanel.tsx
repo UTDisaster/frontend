@@ -127,6 +127,44 @@ const hydrateConversations = async (
     );
 };
 
+type ChatRequestError = Error & {
+    status?: number;
+    retryAfter?: string | null;
+};
+
+const readChatErrorDetail = async (response: Response): Promise<string> => {
+    const fallback = `HTTP ${response.status}`;
+
+    try {
+        const rawText = await response.clone().text();
+        if (!rawText.trim()) {
+            return fallback;
+        }
+
+        try {
+            const payload = JSON.parse(rawText) as {
+                detail?: unknown;
+                message?: unknown;
+            };
+            if (typeof payload.detail === "string" && payload.detail.trim()) {
+                return payload.detail.trim();
+            }
+            if (
+                typeof payload.message === "string" &&
+                payload.message.trim()
+            ) {
+                return payload.message.trim();
+            }
+        } catch {
+            return rawText.trim();
+        }
+    } catch {
+        // Ignore body read failures and fall back to the status code.
+    }
+
+    return fallback;
+};
+
 const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanelProps) => {
     const [conversations, setConversations] =
         useState<ChatConversation[]>(initialConversations);
@@ -167,7 +205,10 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
     );
 
     const connectionLabel = useMemo(
-        () => buildConnectionLabel(connectionState),
+        () =>
+            runtimeConfig.apiBaseUrl
+                ? "Live"
+                : buildConnectionLabel(connectionState),
         [connectionState],
     );
 
@@ -325,7 +366,9 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
                 conversation_id: newConversation.id,
                 message: mapUiMessageToMessageRecord(userMessage),
             };
-            realtimeClientRef.current?.send(outboundEvent);
+            if (!runtimeConfig.apiBaseUrl) {
+                realtimeClientRef.current?.send(outboundEvent);
+            }
         } else if (activeConversation) {
             setConversations((current) =>
                 appendMessageToConversation(
@@ -340,7 +383,9 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
                 conversation_id: activeConversation.id,
                 message: mapUiMessageToMessageRecord(userMessage),
             };
-            realtimeClientRef.current?.send(outboundEvent);
+            if (!runtimeConfig.apiBaseUrl) {
+                realtimeClientRef.current?.send(outboundEvent);
+            }
         }
 
         setDraft("");
@@ -370,17 +415,18 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             })
-                .then((r) => {
+                .then(async (r) => {
                     if (r.ok) {
                         return r.json();
                     }
+
                     const retryAfter =
                         r.status === 503 ? r.headers.get("Retry-After") : null;
-                    const error = new Error(`${r.status}`);
-                    (
-                        error as Error & { retryAfter: string | null }
-                    ).retryAfter = retryAfter;
-                    return Promise.reject(error);
+                    const detail = await readChatErrorDetail(r);
+                    const error = new Error(detail) as ChatRequestError;
+                    error.status = r.status;
+                    error.retryAfter = retryAfter;
+                    throw error;
                 })
                 .then(
                     (data: {
@@ -415,17 +461,29 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
                 .catch((err: unknown) => {
                     let errorText =
                         "Unable to reach the chat service. Please try again later.";
-                    if (err instanceof Error && "retryAfter" in err) {
-                        const raw = (
-                            err as Error & { retryAfter: string | null }
-                        ).retryAfter;
-                        const parsed = parseInt(raw ?? "", 10);
+                    if (err instanceof Error) {
+                        const requestError = err as ChatRequestError;
+                        if (typeof requestError.status === "number") {
+                            errorText = `Chat service returned ${requestError.status}`;
+                            if (requestError.message) {
+                                errorText += `: ${requestError.message}`;
+                            }
+                        }
+
+                        const rawRetryAfter = requestError.retryAfter;
+                        const parsed = parseInt(rawRetryAfter ?? "", 10);
                         if (
                             !Number.isNaN(parsed) &&
                             parsed > 0 &&
                             parsed < 3600
                         ) {
                             errorText += ` (retry after ${parsed}s)`;
+                        } else if (
+                            err instanceof TypeError ||
+                            err.message === "Failed to fetch"
+                        ) {
+                            errorText =
+                                "Unable to reach the chat service. Please check that the backend is running.";
                         }
                     }
                     const errorMessage: ChatMessage = {
