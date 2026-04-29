@@ -5,9 +5,8 @@ export interface ChatRuntimeConfig {
 }
 
 export const getChatRuntimeConfig = (): ChatRuntimeConfig => {
-    const apiBaseUrl = trimTrailingSlash(
-        String(import.meta.env.VITE_API_BASE_URL ?? '').trim(),
-    );
+    const rawBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? '').trim();
+    const apiBaseUrl = rawBaseUrl ? trimTrailingSlash(rawBaseUrl) : '';
 
     return {
         apiBaseUrl,

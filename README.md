@@ -17,7 +17,7 @@ npm run build
 
 ## Environment (optional)
 
-- `VITE_API_BASE_URL` – API base URL for optional REST history (e.g. GET /chat/conversations, GET /chat/:id). Leave unset to use mock chat history. Chat sending is mock-only until the backend defines a real-time API.
+- `VITE_API_BASE_URL` – API base URL for live chat history and message sending (for example, `GET /chat/conversations`, `GET /chat/conversations/{id}`, and `POST /chat/message`). Leave unset to use mock chat history and mock replies.
 
 ## Project structure
 
