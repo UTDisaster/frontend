@@ -8,7 +8,7 @@ export type ChatRealtimeEventHandler = (
 ) => void;
 
 export interface ChatRealtimeClient {
-    mode: 'mock' | 'live';
+    mode: 'mock' | 'live' | 'passthrough';
     connect: () => Promise<void>;
     disconnect: () => void;
     send: (event: ChatOutboundEventEnvelope) => void;

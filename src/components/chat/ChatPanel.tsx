@@ -8,7 +8,7 @@ import type { DisasterContext } from "./types";
 import { createChatHistoryClient } from "./clients/history/createChatHistoryClient";
 import { createMockChatHistoryClient } from "./clients/history/mockChatHistoryClient";
 import type { ChatHistoryClient } from "./clients/history/types";
-import { createMockChatRealtimeClient } from "./clients/realtime/mockChatRealtimeClient";
+import { createChatRealtimeClient } from "./clients/realtime/createChatRealtimeClient";
 import type { ChatRealtimeClient } from "./clients/realtime/types";
 import ChatInput from "./components/ChatInput";
 import ChatHeader from "./components/ChatHeader";
@@ -48,24 +48,35 @@ const sortConversationsByUpdatedAt = (
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
 
-const initialConversations = sortConversationsByUpdatedAt(
-    mockConversations.summaries
-        .map((summary) => {
-            const detail = mockConversations.details[summary.id];
-            if (!detail) {
-                return null;
-            }
+const createInitialConversations = (): ChatConversation[] => {
+    if (!runtimeConfig.enableMockChat) {
+        return [];
+    }
 
-            return mapConversationDetailToUiConversation(detail, summary.title);
-        })
-        .filter((conversation): conversation is ChatConversation =>
-            Boolean(conversation),
-        ),
-);
+    return sortConversationsByUpdatedAt(
+        mockConversations.summaries
+            .map((summary) => {
+                const detail = mockConversations.details[summary.id];
+                if (!detail) {
+                    return null;
+                }
+
+                return mapConversationDetailToUiConversation(
+                    detail,
+                    summary.title,
+                );
+            })
+            .filter((conversation): conversation is ChatConversation =>
+                Boolean(conversation),
+            ),
+    );
+};
 
 const buildConnectionLabel = (state: ChatConnectionState): string => {
     if (state === "connecting") return "Connecting...";
-    if (state === "connected") return "Mock";
+    if (state === "connected") {
+        return runtimeConfig.enableMockChat ? "Mock" : "Connected";
+    }
     if (state === "error") return "Connection error";
     return "Disconnected";
 };
@@ -129,7 +140,7 @@ const hydrateConversations = async (
 
 const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanelProps) => {
     const [conversations, setConversations] =
-        useState<ChatConversation[]>(initialConversations);
+        useState<ChatConversation[]>(createInitialConversations);
     const [activeConversationId, setActiveConversationId] =
         useState<string>(NEW_CHAT_ID);
     const [draft, setDraft] = useState("");
@@ -223,6 +234,10 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
             try {
                 await hydrateAndApply(historyClient);
             } catch {
+                if (!runtimeConfig.enableMockChat) {
+                    return;
+                }
+
                 const mockHistoryClient = createMockChatHistoryClient();
                 await hydrateAndApply(mockHistoryClient);
             }
@@ -239,9 +254,10 @@ const ChatPanel = ({ setIsOpen, viewport, onAction, disasterContext }: ChatPanel
         let isCancelled = false;
         let unsubscribe = () => {};
 
-        const client: ChatRealtimeClient = createMockChatRealtimeClient();
+        const client: ChatRealtimeClient = createChatRealtimeClient(
+            runtimeConfig,
+        );
         realtimeClientRef.current = client;
-        setConnectionState("connecting");
 
         const handleInboundEvent = (event: ChatInboundEventEnvelope) => {
             if (event.type === "chat.error") {
